@@ -8,6 +8,7 @@ setup.py
 ../build/prii3_turtlesim/prii3_turtlesim.egg-info/requires.txt
 ../build/prii3_turtlesim/prii3_turtlesim.egg-info/top_level.txt
 ../build/prii3_turtlesim/prii3_turtlesim.egg-info/zip-safe
+launch/turtlesim_launch.py
 prii3_turtlesim/__init__.py
 prii3_turtlesim/prii3_turtlesim_node.py
 resource/prii3_turtlesim

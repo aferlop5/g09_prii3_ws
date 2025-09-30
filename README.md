@@ -1,78 +1,37 @@
 PRIi3 Turtlesim - Proyecto ROS2
+🚀 Pasos para ponerlo en marcha
 
-Este repositorio contiene el workspace y paquete inicial prii3_turtlesim para la asignatura PRIi3. El objetivo es implementar un nodo de ROS2 en Python que controle el simulador turtlesim y permita dibujar figuras (actualmente un número 9 simple y cerrado).
+1. Clonar el repositorio
 
-Este README está diseñado para futuros sprints, de manera que cualquier integrante del equipo pueda configurar su entorno y ejecutar el código correctamente después de clonar el repositorio.
-
-Contenido del repositorio
-
-El repositorio incluye el workspace prii3_ws con el paquete prii3_turtlesim, que contiene el código fuente Python del nodo, los archivos de configuración package.xml y setup.py, así como pruebas básicas en la carpeta test/.
-
-Requisitos
-
-Sistema operativo: Ubuntu 20.04
-
-ROS2 Foxy
-
-Python 3
-
-Paquetes ROS2 turtlesim y rclpy instalados
-
-Editor de código recomendado: VS Code
-
-Instrucciones para configurar después de clonar
-
-Clonar el repositorio y entrar al workspace:
-
-git clone <URL_DEL_REPOSITORIO>
-cd <ruta_al_workspace>/prii3_ws
+cd ~/universidad_agusti/tercero/proyecto/sprint_1
+git clone <URL_DEL_REPO> prii3_ws
+cd prii3_ws
 
 
-Instalar dependencias (si no están instaladas):
+2. Crear el workspace de ROS 2
+mkdir -p src
+cd src
 
-sudo apt update
-sudo apt install ros-foxy-turtlesim python3-colcon-common-extensions
+
+3. Verificar el paquete prii3_turtlesim
+
+Dentro de prii3_turtlesim encontrarás:
+package.xml → define dependencias (rclpy, turtlesim, launch, launch_ros).
+setup.py → instala el nodo y los ficheros de lanzamiento.
+prii3_turtlesim_node.py → nodo Python que dibuja el número.
+launch/turtlesim_launch.py → archivo de lanzamiento que abre turtlesim y tu nodo drawer.
 
 
-Compilar el workspace:
+4. Compilar el workspace
 
+Desde la raíz del workspace (~/universidad_agusti/tercero/proyecto/sprint_1/prii3_ws):
 colcon build
-
-
-Cargar el entorno (necesario en cada terminal nueva):
-
+Después, cada vez que abras una nueva terminal, carga el entorno:
 source install/setup.bash
 
 
-Ejecutar turtlesim en una terminal:
+5. Ejecutar el sistema completo
 
-ros2 run turtlesim turtlesim_node
-
-
-Ejecutar el nodo prii3_turtlesim en otra terminal:
-
-ros2 run prii3_turtlesim prii3_turtlesim_node
-
-Uso de VS Code
-
-Se recomienda abrir todo el workspace prii3_ws en VS Code para tener autocompletado y navegación de paquetes ROS2. Si se hacen cambios en el código fuente, guardar los cambios, volver a compilar el workspace con colcon build y cargar el entorno con source install/setup.bash antes de ejecutar de nuevo el nodo.
-
-Futuras consideraciones para próximos sprints
-
-Añadir nuevos nodos para controlar otras figuras o funcionalidades.
-
-Mantener un repositorio limpio con commits claros por sprint.
-
-Usar branches por funcionalidades para evitar conflictos.
-
-Asegurarse de que todos los miembros hayan hecho source install/setup.bash antes de ejecutar cualquier nodo.
-
-Actualizar este README con instrucciones específicas de nuevos nodos o scripts.
-
-Comprobación del entorno
-
-Para verificar que ROS2 y el paquete están configurados correctamente:
-
-printenv | grep -i ROS
-ros2 pkg executables prii3_turtlesim
-ros2 node list
+Lanza turtlesim + el nodo drawer desde el único archivo launch:
+ros2 launch prii3_turtlesim turtlesim_launch.py
+Esto abrirá la ventana de turtlesim y la tortuga dibujará el número 9.
