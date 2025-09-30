@@ -1,0 +1,3 @@
+[console_scripts]
+drawer = prii3_turtlesim.prii3_turtlesim_node:main
+
