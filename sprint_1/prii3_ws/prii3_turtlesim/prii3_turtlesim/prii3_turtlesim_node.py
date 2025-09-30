@@ -40,7 +40,7 @@ class TurtleNine(Node):
             msg.angular.z = 0.0
             self.pub.publish(msg)
 
-        # --- Secuencia para dibujar un 9 simple y cerrado ---
+        # --- Secuencia para dibujar un 9---
         # 1. Línea vertical izquierda
         turn(math.pi/2)
 
