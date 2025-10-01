@@ -35,3 +35,23 @@ source install/setup.bash
 Lanza turtlesim + el nodo drawer desde el único archivo launch:
 ros2 launch prii3_turtlesim turtlesim_launch.py
 Esto abrirá la ventana de turtlesim y la tortuga dibujará el número 9.
+
+6. Control del dibujo con servicios
+
+Tu nodo expone servicios ROS2 para pausar, reanudar o reiniciar el dibujo.
+
+📌 Pausar el dibujo
+
+Detiene inmediatamente la tortuga en la posición actual:
+ros2 service call /drawer/pause std_srvs/srv/Trigger "{}"
+
+📌 Reanudar el dibujo
+
+Continúa la secuencia donde se había detenido:
+ros2 service call /drawer/resume std_srvs/srv/Trigger "{}"
+
+📌 Reiniciar el dibujo
+
+Limpia la pantalla, teletransporta la tortuga a la posición inicial y vuelve a empezar el número 9 desde cero:
+ros2 service call /drawer/restart std_srvs/srv/Trigger "{}"
+
