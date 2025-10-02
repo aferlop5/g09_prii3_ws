@@ -1,57 +1,90 @@
-PRIi3 Turtlesim - Proyecto ROS2
-🚀 Pasos para ponerlo en marcha
+PRII3 – Sprint 1 · Grupo 09 · prii3_turtlesim · Gorka German y Agusti Ferrandiz
 
-1. Clonar el repositorio
+Este README explica cómo construir y ejecutar el workspace del Sprint 1 (ROS 2 Foxy) para dibujar el número 9 en turtlesim y controlarlo por servicios.
 
-cd ~/universidad_agusti/tercero/proyecto/sprint_1
-git clone <URL_DEL_REPO> prii3_ws
-cd prii3_ws
+Probado en WSL2 · Ubuntu 20.04 con ROS 2 Foxy.
 
+1) Requisitos
 
-2. Crear el workspace de ROS 2
-mkdir -p src
-cd src
+Ubuntu 20.04 (WSL2 o nativo) con ROS 2 Foxy instalado.
+Paquetes estándar de Foxy (incluye turtlesim, std_srvs, geometry_msgs). Si faltara turtlesim:
 
+  sudo apt update && sudo apt install -y ros-foxy-turtlesim
 
-3. Verificar el paquete prii3_turtlesim
+2) Estructura del workspace
 
-Dentro de prii3_turtlesim encontrarás:
-package.xml → define dependencias (rclpy, turtlesim, launch, launch_ros).
-setup.py → instala el nodo y los ficheros de lanzamiento.
-prii3_turtlesim_node.py → nodo Python que dibuja el número.
-launch/turtlesim_launch.py → archivo de lanzamiento que abre turtlesim y tu nodo drawer.
+Este ZIP contiene el workspace del sprint dentro de sprint_1/prii3_ws:
 
+sprint_1/prii3_ws/
+├─ src/
+│  └─ prii3_turtlesim/
+│     ├─ prii3_turtlesim/           # Código fuente (nodo Python)
+│     │  └─ prii3_turtlesim_node.py
+│     ├─ launch/
+│     │  └─ turtlesim_launch.py     # Lanza turtlesim + nodo drawer
+│     ├─ package.xml
+│     ├─ setup.py
+│     └─ setup.cfg
+├─ (build/ install/ log/)            # Se generan al compilar
+└─ README.md
 
-4. Compilar el workspace
+3) Instalación rápida (primera vez en TU máquina)
 
-Desde la raíz del workspace (~/universidad_agusti/tercero/proyecto/sprint_1/prii3_ws):
-colcon build
-Después, cada vez que abras una nueva terminal, carga el entorno:
-source install/setup.bash
+Consejo: compila limpio en tu equipo, aunque el ZIP traiga build/, install/ o log/ de otra persona.
 
+    0) Cargar ROS Foxy en la shell actual
+    source /opt/ros/foxy/setup.bash
 
-5. Ejecutar el sistema completo
+    1) Ir al workspace del sprint
+    cd <RUTA>/g09_prii3_ws/sprint_1/prii3_ws
 
-Lanza turtlesim + el nodo drawer desde el único archivo launch:
-ros2 launch prii3_turtlesim turtlesim_launch.py
-Esto abrirá la ventana de turtlesim y la tortuga dibujará el número 9.
+    2) Limpiar artefactos previos y compilar
+    rm -rf build/ install/ log/
+    colcon build
 
-6. Control del dibujo con servicios
+    3) Cargar el overlay del workspace
+    source install/setup.bash
 
-Tu nodo expone servicios ROS2 para pausar, reanudar o reiniciar el dibujo.
+IMPORTANTE: Cada vez que abras una terminal nueva: ejecuta los dos source anteriores (Foxy + install/setup.bash).
 
-📌 Pausar el dibujo
+4) Ejecución
 
-Detiene inmediatamente la tortuga en la posición actual:
-ros2 service call /drawer/pause std_srvs/srv/Trigger "{}"
+Lanza todo (turtlesim + nodo que dibuja el 9) con un único launch:
 
-📌 Reanudar el dibujo
+    En el directorio del workspace, con los dos source hechos
 
-Continúa la secuencia donde se había detenido:
-ros2 service call /drawer/resume std_srvs/srv/Trigger "{}"
+    ros2 launch prii3_turtlesim turtlesim_launch.py
 
-📌 Reiniciar el dibujo
+Se abrirá la ventana de turtlesim.
+El nodo prii3_turtlesim_node.py empezará a mover la tortuga para dibujar el 9.
 
-Limpia la pantalla, teletransporta la tortuga a la posición inicial y vuelve a empezar el número 9 desde cero:
-ros2 service call /drawer/restart std_srvs/srv/Trigger "{}"
+5) Servicios disponibles
+
+En otra terminal (repitiendo los dos source), puedes controlar el dibujo:
+
+    Pausa donde esté:
+
+    ros2 service call /drawer/pause   std_srvs/srv/Trigger "{}"
+
+    Reanuda el dibujo:
+
+    ros2 service call /drawer/resume  std_srvs/srv/Trigger "{}"
+
+    Reinicia(limpia y vuelve a dibujar desde el principio):
+
+    ros2 service call /drawer/restart std_srvs/srv/Trigger "{}"
+
+Comprobaciones útiles:
+
+ros2 node list
+ros2 service list | grep drawer
+ros2 topic list | grep cmd_vel
+
+6) Mostrar la estructura
+
+    sudo apt-get update && sudo apt-get install -y tree
+    cd <RUTA>/g09_prii3_ws/sprint_1/prii3_ws
+
+Muestra solo los tres primeros niveles
+tree -L 3 .
 
