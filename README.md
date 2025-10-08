@@ -28,6 +28,8 @@ sprint_1/prii3_ws/
 ├─ (build/ install/ log/)            # Se generan al compilar
 └─ README.md
 
+Comprobación versiones: printenv | grep -i ros
+
 3) Instalación rápida (primera vez en TU máquina)
 
 Consejo: compila limpio en tu equipo, aunque el ZIP traiga build/, install/ o log/ de otra persona.
