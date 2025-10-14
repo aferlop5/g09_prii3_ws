@@ -6,7 +6,7 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='g09_prii3',
-            executable='drawer_number',
+            executable='drawer_number_gazebo',
             name='turtlebot_number_node',
             output='screen'
         )
