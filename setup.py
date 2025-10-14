@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
             'drawer_number_gazebo = g09_prii3.drawer_number_gazebo:main',
             'prii3_turtlesim_node = g09_prii3.prii3_turtlesim_node:main',
+            'jetbot_drawer = g09_prii3.jetbot_drawer_node:main',
         ],
     },
 )

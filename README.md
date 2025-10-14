@@ -1,5 +1,40 @@
 PRII3 – Grupo 09 – Workspace ROS 2 (nodos en src/)
 
+## Sprint 2 — Parte 1: Nodo Jetbot Drawer
+
+Este sprint añade un nodo ROS2 en Python que publica en `/cmd_vel` para que el Jetbot dibuje el número del grupo "09". El nodo expone servicios para pausar, reanudar y reiniciar la trayectoria.
+
+- Nodo: `g09_prii3.jetbot_drawer_node`
+- Ejecutable: `jetbot_drawer`
+- Tópico de salida: `/cmd_vel` (geometry_msgs/Twist)
+- Servicios:
+	- `jetbot_drawer/pause`   (std_srvs/Trigger)
+	- `jetbot_drawer/resume`  (std_srvs/Trigger)
+	- `jetbot_drawer/restart` (std_srvs/Trigger)
+
+### Lanzamiento
+
+Para lanzar el nodo:
+
+```bash
+ros2 launch g09_prii3 sprint2.launch.py
+```
+
+### Control por servicios
+
+```bash
+# Pausar
+ros2 service call /jetbot_drawer/pause std_srvs/srv/Trigger {}
+
+# Reanudar
+ros2 service call /jetbot_drawer/resume std_srvs/srv/Trigger {}
+
+# Reiniciar
+ros2 service call /jetbot_drawer/restart std_srvs/srv/Trigger {}
+```
+
+Este nodo no controla motores directamente; solo publica en `/cmd_vel`. Se integra con el stack `jetbot_pro_ros2` que traduce esos comandos a movimiento del robot.
+
 Este repositorio contiene un workspace ROS 2 organizado para crecer por sprints, con paquetes modulares bajo `src/` y lanzadores en `launch/`.
 
 Probado en Ubuntu 20.04/22.04 con ROS 2 (Foxy/Humble). Ajusta los nombres de distro en los ejemplos si es necesario.
