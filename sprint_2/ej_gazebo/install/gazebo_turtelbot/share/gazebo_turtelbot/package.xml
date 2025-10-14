@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>gazebo_turtelbot</name>
+  <version>0.0.1</version>
+  <description>Simulación y teleoperación automática del TurtleBot3 para el número del grupo (Sprint 2)</description>
+  <maintainer email="agusti@example.com">Agusti</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

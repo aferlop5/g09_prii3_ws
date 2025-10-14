@@ -1,0 +1,61 @@
+[0.000000] (-) TimerEvent: {}
+[0.000899] (gazebo_turtelbot) JobQueued: {'identifier': 'gazebo_turtelbot', 'dependencies': OrderedDict()}
+[0.001179] (gazebo_turtelbot) JobStarted: {'identifier': 'gazebo_turtelbot'}
+[0.099763] (-) TimerEvent: {}
+[0.200380] (-) TimerEvent: {}
+[0.300759] (-) TimerEvent: {}
+[0.401137] (-) TimerEvent: {}
+[0.501896] (-) TimerEvent: {}
+[0.602823] (-) TimerEvent: {}
+[0.703392] (-) TimerEvent: {}
+[0.803708] (-) TimerEvent: {}
+[0.904039] (-) TimerEvent: {}
+[1.004393] (-) TimerEvent: {}
+[1.104791] (-) TimerEvent: {}
+[1.205395] (-) TimerEvent: {}
+[1.305769] (-) TimerEvent: {}
+[1.406218] (-) TimerEvent: {}
+[1.449132] (gazebo_turtelbot) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../build/gazebo_turtelbot', 'build', '--build-base', '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build', 'install', '--record', '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/install.log', '--install-scripts', '$base/lib/gazebo_turtelbot', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/gazebo_turtelbot', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'USER': 'agustifelo', 'SSH_AGENT_PID': '1453', 'XDG_SESSION_TYPE': 'x11', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/usr/lib/x86_64-linux-gnu/gazebo-11/plugins:/opt/ros/foxy/opt/yaml_cpp_vendor/lib:/opt/ros/foxy/opt/rviz_ogre_vendor/lib:/opt/ros/foxy/lib/x86_64-linux-gnu:/opt/ros/foxy/lib', 'HOME': '/home/agustifelo', 'OLDPWD': '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/gazebo_turtelbot', 'DESKTOP_SESSION': 'ubuntu', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'MANAGERPID': '1352', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'IM_CONFIG_PHASE': '1', 'COLCON_PREFIX_PATH': '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_1/prii3_ws/install', 'ROS_DISTRO': 'foxy', 'LOGNAME': 'agustifelo', 'JOURNAL_STREAM': '8:41904', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'agustifelo', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'ROS_LOCALHOST_ONLY': '0', 'WINDOWPATH': '2', 'PATH': '/opt/ros/foxy/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin', 'SESSION_MANAGER': 'local/agustifelo-MacBookAir:@/tmp/.ICE-unix/1491,unix/agustifelo-MacBookAir:/tmp/.ICE-unix/1491', 'INVOCATION_ID': '9960e32f1d7e4d5886325256277c1871', 'XDG_MENU_PREFIX': 'gnome-', 'GNOME_TERMINAL_SCREEN': '/org/gnome/Terminal/screen/4394e666_e40a_4c22_8ed3_0ab87d501366', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'LANG': 'es_ES.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/gdm/Xauthority', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'GNOME_TERMINAL_SERVICE': ':1.80', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_1/prii3_ws/install/prii3_turtlesim:/opt/ros/foxy', 'SHELL': '/bin/bash', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'GPG_AGENT_INFO': '/run/user/1000/gnupg/S.gpg-agent:0:1', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/python3.8/site-packages:/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_1/prii3_ws/install/prii3_turtlesim/lib/python3.8/site-packages:/opt/ros/foxy/lib/python3.8/site-packages', 'COLCON': '1', 'VTE_VERSION': '6003'}, 'shell': False}
+[1.506351] (-) TimerEvent: {}
+[1.606841] (-) TimerEvent: {}
+[1.707186] (-) TimerEvent: {}
+[1.756065] (gazebo_turtelbot) StdoutLine: {'line': b'running egg_info\n'}
+[1.756825] (gazebo_turtelbot) StdoutLine: {'line': b'creating ../build/gazebo_turtelbot/gazebo_turtelbot.egg-info\n'}
+[1.757120] (gazebo_turtelbot) StdoutLine: {'line': b'writing ../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/PKG-INFO\n'}
+[1.757590] (gazebo_turtelbot) StdoutLine: {'line': b'writing dependency_links to ../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/dependency_links.txt\n'}
+[1.757851] (gazebo_turtelbot) StdoutLine: {'line': b'writing entry points to ../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/entry_points.txt\n'}
+[1.758053] (gazebo_turtelbot) StdoutLine: {'line': b'writing requirements to ../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/requires.txt\n'}
+[1.758250] (gazebo_turtelbot) StdoutLine: {'line': b'writing top-level names to ../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/top_level.txt\n'}
+[1.764131] (gazebo_turtelbot) StdoutLine: {'line': b"writing manifest file '../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/SOURCES.txt'\n"}
+[1.807302] (-) TimerEvent: {}
+[1.812038] (gazebo_turtelbot) StdoutLine: {'line': b"reading manifest file '../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/SOURCES.txt'\n"}
+[1.813259] (gazebo_turtelbot) StdoutLine: {'line': b"writing manifest file '../build/gazebo_turtelbot/gazebo_turtelbot.egg-info/SOURCES.txt'\n"}
+[1.813616] (gazebo_turtelbot) StdoutLine: {'line': b'running build\n'}
+[1.813993] (gazebo_turtelbot) StdoutLine: {'line': b'running build_py\n'}
+[1.814196] (gazebo_turtelbot) StdoutLine: {'line': b'creating /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build\n'}
+[1.814320] (gazebo_turtelbot) StdoutLine: {'line': b'creating /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build/lib\n'}
+[1.814529] (gazebo_turtelbot) StdoutLine: {'line': b'creating /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build/lib/gazebo_turtelbot\n'}
+[1.814650] (gazebo_turtelbot) StdoutLine: {'line': b'copying gazebo_turtelbot/draw_number.py -> /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build/lib/gazebo_turtelbot\n'}
+[1.814820] (gazebo_turtelbot) StdoutLine: {'line': b'copying gazebo_turtelbot/__init__.py -> /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build/lib/gazebo_turtelbot\n'}
+[1.814939] (gazebo_turtelbot) StdoutLine: {'line': b'running install\n'}
+[1.815836] (gazebo_turtelbot) StdoutLine: {'line': b'running install_lib\n'}
+[1.817148] (gazebo_turtelbot) StdoutLine: {'line': b'creating /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/python3.8/site-packages/gazebo_turtelbot\n'}
+[1.817378] (gazebo_turtelbot) StdoutLine: {'line': b'copying /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build/lib/gazebo_turtelbot/draw_number.py -> /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/python3.8/site-packages/gazebo_turtelbot\n'}
+[1.817551] (gazebo_turtelbot) StdoutLine: {'line': b'copying /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/build/lib/gazebo_turtelbot/__init__.py -> /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/python3.8/site-packages/gazebo_turtelbot\n'}
+[1.818442] (gazebo_turtelbot) StdoutLine: {'line': b'byte-compiling /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/python3.8/site-packages/gazebo_turtelbot/draw_number.py to draw_number.cpython-38.pyc\n'}
+[1.821141] (gazebo_turtelbot) StdoutLine: {'line': b'byte-compiling /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/python3.8/site-packages/gazebo_turtelbot/__init__.py to __init__.cpython-38.pyc\n'}
+[1.821755] (gazebo_turtelbot) StdoutLine: {'line': b'running install_data\n'}
+[1.822488] (gazebo_turtelbot) StdoutLine: {'line': b'creating /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/share/ament_index\n'}
+[1.822891] (gazebo_turtelbot) StdoutLine: {'line': b'creating /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/share/ament_index/resource_index\n'}
+[1.823236] (gazebo_turtelbot) StdoutLine: {'line': b'creating /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/share/ament_index/resource_index/packages\n'}
+[1.823649] (gazebo_turtelbot) StdoutLine: {'line': b'copying resource/gazebo_turtelbot -> /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/share/ament_index/resource_index/packages\n'}
+[1.823831] (gazebo_turtelbot) StdoutLine: {'line': b'copying package.xml -> /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/share/gazebo_turtelbot\n'}
+[1.823946] (gazebo_turtelbot) StdoutLine: {'line': b'running install_egg_info\n'}
+[1.826058] (gazebo_turtelbot) StdoutLine: {'line': b'Copying ../build/gazebo_turtelbot/gazebo_turtelbot.egg-info to /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/python3.8/site-packages/gazebo_turtelbot-0.0.0-py3.8.egg-info\n'}
+[1.827564] (gazebo_turtelbot) StdoutLine: {'line': b'running install_scripts\n'}
+[1.862143] (gazebo_turtelbot) StdoutLine: {'line': b'Installing draw_number script to /home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/install/gazebo_turtelbot/lib/gazebo_turtelbot\n'}
+[1.862858] (gazebo_turtelbot) StdoutLine: {'line': b"writing list of installed files to '/home/agustifelo/universidad_agusti/tercero/proyecto/sprint_2/ej_gazebo/build/gazebo_turtelbot/install.log'\n"}
+[1.894512] (gazebo_turtelbot) CommandEnded: {'returncode': 0}
+[1.907422] (-) TimerEvent: {}
+[1.943990] (gazebo_turtelbot) JobEnded: {'identifier': 'gazebo_turtelbot', 'rc': 0}
+[1.945083] (-) EventReactorShutdown: {}

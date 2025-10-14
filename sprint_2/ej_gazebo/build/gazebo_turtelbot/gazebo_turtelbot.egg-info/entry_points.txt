@@ -1,0 +1,3 @@
+[console_scripts]
+draw_number = gazebo_turtelbot.draw_number:main
+
