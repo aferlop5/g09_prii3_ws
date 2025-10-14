@@ -1,92 +1,63 @@
-PRII3 – Sprint 1 · Grupo 09 · prii3_turtlesim · Gorka German y Agusti Ferrandiz
+PRII3 – Grupo 09 – Workspace ROS2 (nodos en src/)
 
-Este README explica cómo construir y ejecutar el workspace del Sprint 1 (ROS 2 Foxy) para dibujar el número 9 en turtlesim y controlarlo por servicios.
+Este repositorio contiene un workspace ROS 2 organizado para crecer por sprints, con paquetes modulares bajo `src/` y lanzadores comunes en un paquete de bringup.
 
-Probado en WSL2 · Ubuntu 20.04 con ROS 2 Foxy.
+Probado en Ubuntu 20.04/22.04 con ROS 2 (Foxy/Humble). Ajusta los nombres de distro en los ejemplos si es necesario.
 
-1) Requisitos
+Requisitos
 
-Ubuntu 20.04 (WSL2 o nativo) con ROS 2 Foxy instalado.
-Paquetes estándar de Foxy (incluye turtlesim, std_srvs, geometry_msgs). Si faltara turtlesim:
+- ROS 2 instalado y configurado (Foxy/Humble). Ejemplo para turtlesim en Foxy:
 
-  sudo apt update && sudo apt install -y ros-foxy-turtlesim
+    sudo apt update && sudo apt install -y ros-foxy-turtlesim
 
-2) Estructura del workspace
+Estructura actual (paquete único ament_python):
 
-Este ZIP contiene el workspace del sprint dentro de sprint_1/prii3_ws:
-
-sprint_1/prii3_ws/
+g09_prii3_ws/
+├─ launch/
+│  ├─ sprint1.launch.py       # turtlesim + prii3_turtlesim_node
+│  └─ sprint2.launch.py       # drawer_number (TurtleBot pattern)
 ├─ src/
-│  └─ prii3_turtlesim/
-│     ├─ prii3_turtlesim/           # Código fuente (nodo Python)
-│     │  └─ prii3_turtlesim_node.py
-│     ├─ launch/
-│     │  └─ turtlesim_launch.py     # Lanza turtlesim + nodo drawer
-│     ├─ package.xml
-│     ├─ setup.py
-│     └─ setup.cfg
-├─ (build/ install/ log/)            # Se generan al compilar
+│  └─ g09_prii3/
+│     ├─ prii3_turtlesim_node.py  # Nodo sprint 1
+│     └─ drawer_number.py         # Nodo sprint 2
+├─ package.xml
+├─ setup.py
+├─ setup.cfg
+├─ resource/g09_prii3
+├─ .gitignore
 └─ README.md
 
-Comprobación versiones: printenv | grep -i ros
+Construcción
 
-3) Instalación rápida (primera vez en TU máquina)
+1) Cargar el entorno de ROS 2 en la terminal actual
 
-Consejo: compila limpio en tu equipo, aunque el ZIP traiga build/, install/ o log/ de otra persona.
+source /opt/ros/$ROS_DISTRO/setup.bash
 
-    0) Cargar ROS Foxy en la shell actual
-    source /opt/ros/foxy/setup.bash
+2) Compilar desde la raíz del workspace
 
-    1) Ir al workspace del sprint
-    cd <RUTA>/g09_prii3_ws/sprint_1/prii3_ws
+colcon build
 
-    2) Limpiar artefactos previos y compilar
-    rm -rf build/ install/ log/
-    colcon build
+3) Cargar el overlay del workspace
 
-    3) Cargar el overlay del workspace
-    source install/setup.bash
+source install/setup.bash
 
-IMPORTANTE: Cada vez que abras una terminal nueva: ejecuta los dos source anteriores (Foxy + install/setup.bash).
+Ejecución por sprint
 
-4) Ejecución
+- Sprint 1 (turtlesim + nodo que dibuja el 9):
 
-Lanza todo (turtlesim + nodo que dibuja el 9) con un único launch:
+    ros2 launch g09_prii3 sprint1.launch.py
 
-    En el directorio del workspace, con los dos source hechos
-
-    ros2 launch prii3_turtlesim turtlesim_launch.py
-
-Se abrirá la ventana de turtlesim.
-El nodo prii3_turtlesim_node.py empezará a mover la tortuga para dibujar el 9.
-
-5) Servicios disponibles
-
-En otra terminal (repitiendo los dos source), puedes controlar el dibujo:
-
-    Pausa donde esté:
-
+    Servicios útiles:
     ros2 service call /drawer/pause   std_srvs/srv/Trigger "{}"
-
-    Reanuda el dibujo:
-
     ros2 service call /drawer/resume  std_srvs/srv/Trigger "{}"
-
-    Reinicia(limpia y vuelve a dibujar desde el principio):
-
     ros2 service call /drawer/restart std_srvs/srv/Trigger "{}"
 
-Comprobaciones útiles:
+- Sprint 2 (nodo para TurtleBot):
 
-ros2 node list
-ros2 service list | grep drawer
-ros2 topic list | grep cmd_vel
+    ros2 launch g09_prii3 sprint2.launch.py
 
-6) Mostrar la estructura
+Notas
 
-    sudo apt-get update && sudo apt-get install -y tree
-    cd <RUTA>/g09_prii3_ws/sprint_1/prii3_ws
-
-Muestra solo los tres primeros niveles
-tree -L 3 .
+- build/, install/ y log/ están ignorados en git. Compila en limpio si cambias de entorno.
+- Para añadir un nuevo sprint: agrega un nuevo script a `src/g09_prii3/` y crea su correspondiente `launch/sprintX.launch.py`.
 

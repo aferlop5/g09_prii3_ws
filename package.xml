@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>g09_prii3</name>
+  <version>0.1.0</version>
+  <description>Workspace del Grupo 09 con nodos organizados por sprint (nodos en src/).</description>
+  <maintainer email="aferlop5@upv.edu.es">Grupo 09</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- Dependencias runtime de los nodos -->
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <exec_depend>turtlesim</exec_depend>
+
+  <!-- Para launch files -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
