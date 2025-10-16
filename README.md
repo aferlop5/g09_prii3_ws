@@ -1,6 +1,6 @@
 <sub>README optimizado para verse en GitHub</sub>
 
-# PRII3 · Grupo 09 – Workspace ROS 2
+# PRII3 · Grupo 09 – Workspace ROS2
 
 <div align="center">
   <!-- Badges centrados -->
