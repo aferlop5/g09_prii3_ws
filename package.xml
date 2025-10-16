@@ -11,6 +11,7 @@
   <!-- Dependencias runtime de los nodos -->
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
   <depend>std_srvs</depend>
   <exec_depend>turtlesim</exec_depend>
 

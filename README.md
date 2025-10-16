@@ -23,7 +23,8 @@ Estructura del workspace
 g09_prii3_ws/
 ├─ launch/
 │  ├─ sprint1.launch.py
-│  └─ sprint2.launch.py
+│  ├─ sprint2.launch.py
+│  └─ obstacle_avoidance.launch.py
 ├─ resource/
 │  └─ g09_prii3
 ├─ src/
@@ -31,7 +32,8 @@ g09_prii3_ws/
 │     ├─ __init__.py
 │     ├─ prii3_turtlesim_node.py
 │     ├─ drawer_number_gazebo.py
-│     └─ jetbot_drawer_node.py
+│     ├─ jetbot_drawer_node.py
+│     └─ obstacle_avoidance_node.py
 ├─ package.xml
 ├─ setup.py
 ├─ setup.cfg
@@ -48,10 +50,12 @@ Archivos clave (abre con un clic)
 - [resource/g09_prii3](resource/g09_prii3)  
 - [launch/sprint1.launch.py](launch/sprint1.launch.py)  
 - [launch/sprint2.launch.py](launch/sprint2.launch.py)  
+- [launch/obstacle_avoidance.launch.py](launch/obstacle_avoidance.launch.py)  
 - [src/g09_prii3/__init__.py](src/g09_prii3/__init__.py)  
 - [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py) — clase principal: [`TurtleNine`](src/g09_prii3/prii3_turtlesim_node.py)  
 - [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase principal: [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)  
 - [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py) — clase principal: [`TurtlebotNine`](src/g09_prii3/drawer_number_gazebo.py)  
+- [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py) — clase principal: [`JetbotAvoider`](src/g09_prii3/obstacle_avoidance_node.py)  
 - [.vscode/settings.json](.vscode/settings.json)
 
 ---
@@ -130,7 +134,40 @@ ros2 launch g09_prii3 sprint2.launch.py
 ```
 Archivo de launch: [launch/sprint2.launch.py](launch/sprint2.launch.py)
 
+Evitación de obstáculos con Lidar (Sprint 2)
 ---
+Nodo: `jetbot_obstacle_avoidance`  
+Archivo: [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py) — clase [`JetbotAvoider`](src/g09_prii3/obstacle_avoidance_node.py)
+
+Descripción
+- Publica velocidad en `/cmd_vel` y se suscribe a `/scan` (Lidar) para detectar obstáculos.
+- Modo `simple`: se detiene si un obstáculo está más cerca que un umbral (por defecto 0.3 m) y reanuda cuando despeja.
+- Modo `advanced`: esquiva el obstáculo girando hacia el lado con mayor despeje mientras avanza lentamente.
+- Logs informativos: "Avanzando", "obstáculo detectado — deteniendo", "evitando obstáculo", etc.
+
+Parámetros
+- `linear_speed` (float, default 0.15): velocidad lineal (m/s)
+- `angular_speed` (float, default 0.6): velocidad angular (rad/s)
+- `obstacle_threshold` (float, default 0.3): umbral de detección frontal (m)
+- `avoidance_mode` (string, default `simple`): `simple` | `advanced`
+
+Ejecución directa
+```bash
+ros2 run g09_prii3 jetbot_obstacle_avoidance
+```
+
+Lanzar con argumentos (por ejemplo, modo avanzado)
+```bash
+ros2 launch g09_prii3 obstacle_avoidance.launch.py avoidance_mode:=advanced
+```
+Archivo de launch: [launch/obstacle_avoidance.launch.py](launch/obstacle_avoidance.launch.py)
+
+Uso en Sprint 2 (ambos nodos)
+```bash
+ros2 launch g09_prii3 sprint2.launch.py
+```
+Nota: `sprint2.launch.py` lanza `jetbot_drawer` y `jetbot_obstacle_avoidance`. Ambos publican en `/cmd_vel`; en un robot real conviene lanzar solo uno de ellos según el objetivo (dibujo vs. evitación). Para pruebas separadas, ejecuta cada launch por independiente.
+
 
 Ejercicios — Gazebo / TurtleBot3
 ---
@@ -173,7 +210,7 @@ Recursos y enlaces rápidos
 - Paquete: [package.xml](package.xml)  
 - Entradas ejecutables: [setup.py](setup.py)  
 - Launch: [launch/sprint1.launch.py](launch/sprint1.launch.py), [launch/sprint2.launch.py](launch/sprint2.launch.py)  
-- Código fuente: [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py), [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py), [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py)
+- Código fuente: [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py), [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py), [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py), [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py)
 
 ---
 
