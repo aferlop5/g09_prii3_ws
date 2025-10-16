@@ -82,7 +82,7 @@ source install/setup.bash
 
 ---
 
-Sprint 1 — Turtlesim 🐢
+Sprint 1 — Turtlesim
 ---
 Nodo: `prii3_turtlesim_node`  
 Archivo: [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py) — clase [`TurtleNine`](src/g09_prii3/prii3_turtlesim_node.py)
@@ -104,7 +104,7 @@ ros2 service call /drawer/restart std_srvs/srv/Trigger "{}"
 
 ---
 
-Sprint 2 — JetBot 🤖
+Sprint 2 — JetBot
 ---
 Nodo: `jetbot_drawer`  
 Archivo: [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)
@@ -132,7 +132,7 @@ Archivo de launch: [launch/sprint2.launch.py](launch/sprint2.launch.py)
 
 ---
 
-Ejercicios — Gazebo / TurtleBot3 🛰️
+Ejercicios — Gazebo / TurtleBot3
 ---
 Nodo: `drawer_number` (simulación / TB3)  
 Archivo: [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py) — clase [`TurtlebotNine`](src/g09_prii3/drawer_number_gazebo.py)
