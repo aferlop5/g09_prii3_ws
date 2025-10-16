@@ -24,7 +24,9 @@ g09_prii3_ws/
 ├─ launch/
 │  ├─ sprint1.launch.py
 │  ├─ sprint2.launch.py
-│  └─ obstacle_avoidance.launch.py
+│  ├─ obstacle_avoidance.launch.py
+│  ├─ obstacle_avoidance_simple.launch.py
+│  └─ obstacle_avoidance_advanced.launch.py
 ├─ resource/
 │  └─ g09_prii3
 ├─ src/
@@ -51,6 +53,8 @@ Archivos clave (abre con un clic)
 - [launch/sprint1.launch.py](launch/sprint1.launch.py)  
 - [launch/sprint2.launch.py](launch/sprint2.launch.py)  
 - [launch/obstacle_avoidance.launch.py](launch/obstacle_avoidance.launch.py)  
+- [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)  
+- [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)  
 - [src/g09_prii3/__init__.py](src/g09_prii3/__init__.py)  
 - [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py) — clase principal: [`TurtleNine`](src/g09_prii3/prii3_turtlesim_node.py)  
 - [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase principal: [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)  
@@ -156,11 +160,17 @@ Ejecución directa
 ros2 run g09_prii3 jetbot_obstacle_avoidance
 ```
 
-Lanzar con argumentos (por ejemplo, modo avanzado)
+Launch dedicados por modo (sin parámetros)
 ```bash
-ros2 launch g09_prii3 obstacle_avoidance.launch.py avoidance_mode:=advanced
+# Modo simple (se detiene ante el obstáculo y reanuda cuando despeja)
+ros2 launch g09_prii3 obstacle_avoidance_simple.launch.py
+
+# Modo avanzado (evita el obstáculo girando y avanzando lentamente)
+ros2 launch g09_prii3 obstacle_avoidance_advanced.launch.py
 ```
-Archivo de launch: [launch/obstacle_avoidance.launch.py](launch/obstacle_avoidance.launch.py)
+Archivos de launch:
+- [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)
+- [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)
 
 Uso en Sprint 2 (ambos nodos)
 ```bash
