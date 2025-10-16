@@ -23,8 +23,7 @@ Estructura del workspace
 g09_prii3_ws/
 ├─ launch/
 │  ├─ sprint1.launch.py
-│  ├─ sprint2.launch.py
-│  ├─ obstacle_avoidance.launch.py
+│  ├─ jetbot_drawer.launch.py
 │  ├─ obstacle_avoidance_simple.launch.py
 │  └─ obstacle_avoidance_advanced.launch.py
 ├─ resource/
@@ -51,8 +50,7 @@ Archivos clave (abre con un clic)
 - [.gitignore](.gitignore)  
 - [resource/g09_prii3](resource/g09_prii3)  
 - [launch/sprint1.launch.py](launch/sprint1.launch.py)  
-- [launch/sprint2.launch.py](launch/sprint2.launch.py)  
-- [launch/obstacle_avoidance.launch.py](launch/obstacle_avoidance.launch.py)  
+- [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)  
 - [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)  
 - [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)  
 - [src/g09_prii3/__init__.py](src/g09_prii3/__init__.py)  
@@ -134,9 +132,9 @@ ros2 service call /jetbot_drawer/restart std_srvs/srv/Trigger {}
 
 También puedes lanzar con:
 ```bash
-ros2 launch g09_prii3 sprint2.launch.py
+ros2 launch g09_prii3 jetbot_drawer.launch.py
 ```
-Archivo de launch: [launch/sprint2.launch.py](launch/sprint2.launch.py)
+Archivo de launch: [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)
 
 Evitación de obstáculos con Lidar (Sprint 2)
 ---
@@ -172,11 +170,7 @@ Archivos de launch:
 - [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)
 - [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)
 
-Uso en Sprint 2 (ambos nodos)
-```bash
-ros2 launch g09_prii3 sprint2.launch.py
-```
-Nota: `sprint2.launch.py` lanza `jetbot_drawer` y `jetbot_obstacle_avoidance`. Ambos publican en `/cmd_vel`; en un robot real conviene lanzar solo uno de ellos según el objetivo (dibujo vs. evitación). Para pruebas separadas, ejecuta cada launch por independiente.
+Nota: para el dibujo del "09" usa `jetbot_drawer.launch.py`. Para evitación de obstáculos usa uno de los launch dedicados indicados arriba.
 
 
 Ejercicios — Gazebo / TurtleBot3
@@ -187,11 +181,10 @@ Archivo: [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gaz
 Descripción
 - Publica en `/cmd_vel` y termina al completar la secuencia. Diseñado para pruebas en simulador (Gazebo / TurtleBot3).
 
-Lanzar:
+Ejecución directa:
 ```bash
-ros2 launch g09_prii3 sprint2.launch.py
+ros2 run g09_prii3 drawer_number_gazebo
 ```
-Archivo de launch: [launch/sprint2.launch.py](launch/sprint2.launch.py)
 
 ---
 
@@ -219,7 +212,7 @@ Recursos y enlaces rápidos
 ---
 - Paquete: [package.xml](package.xml)  
 - Entradas ejecutables: [setup.py](setup.py)  
-- Launch: [launch/sprint1.launch.py](launch/sprint1.launch.py), [launch/sprint2.launch.py](launch/sprint2.launch.py)  
+- Launch: [launch/sprint1.launch.py](launch/sprint1.launch.py), [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)  
 - Código fuente: [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py), [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py), [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py), [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py)
 
 ---

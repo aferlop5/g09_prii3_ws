@@ -12,12 +12,5 @@ def generate_launch_description():
             name='jetbot_drawer',
             output='screen',
             parameters=[],
-        ),
-        Node(
-            package='g09_prii3',
-            executable='jetbot_obstacle_avoidance',
-            name='jetbot_obstacle_avoidance',
-            output='screen',
-            parameters=[{'avoidance_mode': 'simple'}],
-        ),
+        )
     ])
