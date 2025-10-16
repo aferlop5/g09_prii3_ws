@@ -1,4 +1,6 @@
-# 🚀 PRII3 · Grupo 09 – Workspace ROS 2 (nodos en src/)
+<sub>README optimizado para verse en GitHub</sub>
+
+# PRII3 · Grupo 09 – Workspace ROS 2
 
 <div align="center">
   <!-- Badges centrados -->
@@ -176,7 +178,7 @@ Recursos y enlaces rápidos
 ---
 
 <center>
-**Autores:** Gorka German · Agustí Ferrandiz
+**Autor:** Agustí Ferrandiz
 
 <img alt="status" src="https://img.shields.io/badge/status-active-brightgreen" /> 
 <img alt="license" src="https://img.shields.io/badge/license-MIT-blue" />
