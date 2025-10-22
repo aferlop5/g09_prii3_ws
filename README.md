@@ -59,7 +59,7 @@ Archivos clave (abre con un clic)
 - [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase principal: [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)  
 - [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py) — clase principal: [`TurtlebotNine`](src/g09_prii3/drawer_number_gazebo.py)  
 - [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py) — clase principal: [`JetbotAvoider`](src/g09_prii3/obstacle_avoidance_node.py)  
-- [src/g09_prii3/Potential_Fields.py](src/g09_prii3/Potential_Fields.py) — clase principal: [`JetbotAvoider`](src/g09_prii3/Potential_Fields.py)  
+- [src/g09_prii3/Potential_Fields.py](src/g09_prii3/Potential_Fields.py) — clase principal: [`PotentialFieldsNavigator`](src/g09_prii3/Potential_Fields.py)  
 - [.vscode/settings.json](.vscode/settings.json)
 
 ---
@@ -237,108 +237,49 @@ ros2 run g09_prii3 drawer_number_gazebo
 
 ---
 
-Navegación — Campos Potenciales (ejercicio)
+Navegación — Campos Potenciales (JetBot / Gazebo)
 ---
 Nodo: `jetbot_potential_fields`  
-Archivo: [src/g09_prii3/Potential_Fields.py](src/g09_prii3/Potential_Fields.py) — clase [`JetbotAvoider`](src/g09_prii3/Potential_Fields.py)
+Archivo: [src/g09_prii3/Potential_Fields.py](src/g09_prii3/Potential_Fields.py) — clase [`PotentialFieldsNavigator`](src/g09_prii3/Potential_Fields.py)
 
 Descripción
-- Navegación hacia una meta en el marco global utilizando campos potenciales con evitación por LIDAR.
-- Algoritmo mejorado para espacios pequeños con muchos obstáculos: suavizado de heading, empuje mínimo hacia delante, y un modo de seguimiento de pared (wall‑follow) automático para escapar de mínimos locales.
+- Navegación reactiva hacia una meta global `(goal_x, goal_y)` usando Campos Potenciales: atracción hacia la meta + repulsión por LIDAR.
+- Integra odometría (`/odom`) para calcular el vector atractivo real (posición del robot en mundo → vector en el frame del robot).
+- Estabilidad: suavizado low‑pass de comandos, reducción de velocidad cerca de obstáculos y ante grandes errores angulares.
+- Robustez: detección de estancamiento y recuperación (giro breve hacia el lado con más espacio), muestreo por sectores y percentiles en la repulsión para evitar ruido.
 
-Lanzar (con objetivo en metros en `odom`)
+Lanzar (meta en metros en `odom`)
 ```bash
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03
-```
-
-Modos de lanzamiento rápidos (según entorno)
-```bash
-# 1) Espacios pequeños / muy obstaculizados (wall-follow más activo)
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03 \
-  --ros-args \
-  -p min_linear_speed:=0.08 -p heading_cruise_angle:=0.6 -p front_cruise_clearance:=0.6 \
-  -p wall_follow_enter_front:=0.30 -p wall_follow_exit_front:=0.70 \
-  -p wall_distance:=0.40 -p v_wall:=0.10 -p w_wall_gain:=1.0 \
-  -p k_att:=1.0 -p k_rep:=0.5 -p repulsive_radius:=0.9 -p goal_tolerance:=0.08
-
-# 2) Pasillo/corredor (seguir pared derecha)
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03 \
-  --ros-args \
-  -p wall_follow_side:=right -p wall_distance:=0.35 \
-  -p wall_follow_enter_front:=0.35 -p wall_follow_exit_front:=0.80 \
-  -p min_linear_speed:=0.07 -p heading_cruise_angle:=0.5 -p v_wall:=0.12 -p w_wall_gain:=1.2 \
-  -p k_rep:=0.4 -p repulsive_radius:=0.8
-
-#    (seguir pared izquierda)
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03 \
-  --ros-args -p wall_follow_side:=left
-
-# 3) Área abierta (pocos obstáculos, menos repulsivo)
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03 \
-  --ros-args \
-  -p k_rep:=0.3 -p repulsive_radius:=0.7 \
-  -p heading_cruise_angle:=0.9 -p front_cruise_clearance:=0.4 -p min_linear_speed:=0.06 \
-  -p progress_timeout:=7.0
-
-# 4) Aproximación precisa a la meta (más fino cerca del objetivo)
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03 \
-  --ros-args \
-  -p max_linear_speed:=0.18 -p max_angular_speed:=0.9 \
-  -p goal_tolerance:=0.05 -p repulsive_radius:=0.8 -p k_rep:=0.45 \
-  -p v_wall:=0.08
-
-# 5) Anti-atascos agresivo (salir rápido de mínimos locales)
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03 \
-  --ros-args \
-  -p progress_timeout:=3.0 -p progress_epsilon:=0.03 \
-  -p wall_follow_enter_front:=0.32 -p wall_follow_exit_front:=0.70 \
-  -p w_wall_gain:=1.2
+ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.80 goal_y:=-0.03
 ```
 
 Parámetros principales
-- `goal_x`, `goal_y` (float): objetivo en marco global (por defecto 1.0, 0.0)
-- `goal_tolerance` (float, default 0.10): tolerancia de llegada (m)
-- `global_frame` (string, default `odom`) y `base_frame` (string, default `base_link`)
-- `max_linear_speed` (float, default 0.25) y `max_angular_speed` (float, default 1.2)
-- `min_linear_speed` (float, default 0.06): empuje mínimo hacia delante si hay despeje
-- `heading_cruise_angle` (float rad, default 0.7): umbral angular para aplicar `min_linear_speed`
-- `front_cruise_clearance` (float m, default 0.5): despeje frontal requerido para `min_linear_speed`
-- `heading_smoothing_alpha` (float, default 0.3): suavizado exponencial del heading para reducir zig‑zag
-- `wall_follow_enter_front` (float m, default 0.35): entra a seguimiento de pared si el despeje frontal cae por debajo
-- `wall_follow_exit_front` (float m, default 0.7): sale del seguimiento de pared cuando hay despeje
-- `wall_follow_side` (string, default `auto`): `auto` | `left` | `right`
-- `wall_distance` (float m, default 0.35): distancia objetivo a la pared en seguimiento
-- `v_wall` (float m/s, default 0.10): velocidad lineal máxima en modo pared
-- `w_wall_gain` (float, default 1.0): ganancia de corrección angular manteniendo distancia a pared
-- `progress_timeout` (float s, default 5.0): tiempo sin mejorar distancia a meta para activar pared
-- `progress_epsilon` (float m, default 0.05): umbral de mejora mínima
-- `k_att` (float, default 1.0): ganancia atractiva a la meta
-- `k_rep` (float, default 0.4): ganancia repulsiva de obstáculos
-- `repulsive_radius` (float m, default 0.8): radio de influencia de obstáculos
-- `min_range_clip` (float m, default 0.05): recorte inferior de lecturas LIDAR
-- `front_stop_threshold` (float m, default 0.25): parada dura por seguridad
-- `search_turn_speed` (float rad/s, default 0.6): giro suave al esperar TF
+- `goal_x`, `goal_y` (float): objetivo en `odom`.
+- `goal_tolerance` (float, default 0.10): radio de llegada en metros.
+- `odom_topic` (string, default `/odom`): tópico de odometría.
+- `k_att` (float, default 1.0): ganancia atractiva.
+- `k_rep` (float, default 0.30): ganancia repulsiva.
+- `d0_rep` (float, default 0.53): radio de influencia repulsiva.
+- `max_lin_vel` (float, default 0.30), `max_ang_vel` (float, default 1.0): límites de velocidad.
+- `ang_gain` (float, default 1.5), `lin_gain` (float, default 1.0): ganancias del controlador.
+- `slowdown_min_scale` (float, default 0.18): factor mínimo de velocidad cerca de obstáculos.
+- `front_weight_deg` (float, default 85.0): ancho del sector frontal priorizado en repulsión.
+- `rep_scale_side` (float, default 0.45): peso relativo de repulsión en laterales.
+- `smooth_alpha` (float, default 0.30): coeficiente de suavizado de `v`/`w` (0..1).
+- `stuck_timeout` (float, default 3.0): tiempo sin progreso para activar recuperación.
+- `escape_gain` (float, default 0.20): pequeña perturbación aleatoria para escapar de mínimos locales.
 
-Ejemplo de ajuste (Gazebo)
-```bash
-ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.8 goal_y:=-0.03 \
-  --ros-args \
-  -p max_linear_speed:=0.25 -p max_angular_speed:=1.2 \
-  -p min_linear_speed:=0.06 -p heading_cruise_angle:=0.7 -p front_cruise_clearance:=0.6 \
-  -p k_att:=1.0 -p k_rep:=0.4 -p repulsive_radius:=0.9 -p goal_tolerance:=0.08
-```
+Tópicos
+- Sub: `/scan` (sensor_msgs/LaserScan), `/odom` (nav_msgs/Odometry)
+- Pub: `/cmd_vel` (geometry_msgs/Twist)
 
-Requisitos de topics/TF
-- LIDAR publicando en `/scan`.
-- TF disponible de `odom -> base_link`.
+Consejos de afinado
+- Más distancia frontal: sube `d0_rep` (+0.02..0.05) y/o `k_rep` (+0.02..0.05).
+- Más holgura lateral al girar: sube `rep_scale_side` (0.45→0.55) y/o `front_weight_deg` (85→90).
+- Menos oscilación: baja `ang_gain` o sube `smooth_alpha` (p.ej. 0.35).
+- Más decisión hacia meta (en despeje): sube `lin_gain` o baja `slowdown_min_scale` con cuidado.
 
 Archivo de launch: [launch/Potential_Fields.launch.py](launch/Potential_Fields.launch.py)
-
-Consejos
-- En espacios muy pequeños, activa el seguimiento de pared más agresivo reduciendo `wall_follow_enter_front` (p.ej. 0.30) y aumentando `wall_distance` (0.40–0.45). 
-- Si el robot no avanza y sólo gira, incrementa `min_linear_speed` a 0.08–0.10 y/o `front_cruise_clearance` a 0.6–0.8 m.
-- Si se acerca demasiado a obstáculos, sube `k_rep` o `repulsive_radius`.
-- Si hay muchas oscilaciones, reduce `heading_smoothing_alpha` (p.ej. 0.2).
 
 ---
 
