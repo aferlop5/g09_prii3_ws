@@ -88,6 +88,53 @@ source install/setup.bash
 
 ---
 
+Solución a "Package 'g09_prii3' not found"
+---
+Si al lanzar ves un error como:
+
+```
+Package 'g09_prii3' not found
+```
+
+es porque tu shell no ha cargado el overlay de este workspace. Arréglalo así:
+
+1) Construye y fuentea este workspace en la terminal donde vas a lanzar
+```bash
+cd ~/agus/g09_prii3_ws
+rm -rf build/ install/ log/
+colcon build --symlink-install
+source install/setup.bash   # IMPORTANTE: hacer esto en cada terminal nueva
+```
+
+2) Verifica que ROS lo ve
+```bash
+ros2 pkg list | grep g09_prii3 || true
+ros2 pkg prefix g09_prii3
+```
+Deberías ver la ruta de `install/` de este workspace.
+
+3) Lanza de nuevo
+```bash
+ros2 launch g09_prii3 obstacle_avoidance_simple.launch.py
+```
+
+Notas importantes (overlay y .bashrc)
+- El orden de sourcing importa. Primero el sistema base y después tus overlays (el último gana):
+```bash
+source /opt/ros/foxy/setup.bash
+source ~/agus/g09_prii3_ws/install/setup.bash
+```
+- Para hacerlo persistente, añade esas líneas al final de tu `~/.bashrc` y abre una nueva terminal.
+- Si ya estás sourceando otro workspace (p.ej. `~/jetbot_ws/install/setup.bash`), asegúrate de sourcear ESTE después para que se vea `g09_prii3`.
+
+Alternativa rápida (sin paquete en índice)
+```bash
+ros2 launch ~/agus/g09_prii3_ws/launch/obstacle_avoidance_simple.launch.py
+```
+Puedes lanzar por ruta absoluta del archivo de launch mientras verificas el entorno, aunque lo recomendable es el método por paquete.
+
+---
+
 Sprint 1 — Turtlesim
 ---
 Nodo: `prii3_turtlesim_node`  

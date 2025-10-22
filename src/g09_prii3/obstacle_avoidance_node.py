@@ -27,6 +27,7 @@ Notes:
 
 from typing import List, Optional, Tuple
 import math
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -74,6 +75,17 @@ class JetbotAvoider(Node):
         # State
         self._last_scan = None  # type: Optional[LaserScan]
         self._state = 'forward'  # 'forward' | 'stopped' | 'avoid_left' | 'avoid_right'
+        self._last_turn_dir = +1  # +1 left, -1 right (advanced)
+        self._avoid_start_sec = None  # type: Optional[float]
+
+        # Advanced-mode tuning (does not affect simple mode)
+        self._resume_factor = 1.25  # need a bit more clearance before resuming forward
+        self._front_cone_deg = 30.0  # degrees around the front to assess obstacle
+        self._side_inner_deg = 40.0  # start of side sector from forward
+        self._side_outer_deg = 100.0  # end of side sector
+        self._creep_factor = 0.3  # fraction of linear speed while avoiding
+        self._search_w_factor = 0.8  # fraction of angular speed when searching in place
+        self._stuck_timeout = 3.0  # seconds blocked before trying rotate-in-place
 
         # Control loop at ~10 Hz
         self._timer = self.create_timer(0.1, self._control_loop)
@@ -106,6 +118,64 @@ class JetbotAvoider(Node):
         vals = self._finite_values(sector)
         return min(vals) if vals else None
 
+    # ---- Advanced-only helpers (angle-aware sectors; keep simple path unchanged) ----
+    def _now_sec(self) -> float:
+        return float(self.get_clock().now().nanoseconds) / 1e9
+
+    def _sector_values_by_deg(self, min_deg: float, max_deg: float) -> List[float]:
+        """Return finite scan values within [min_deg, max_deg] sector (degrees around 0=front)."""
+        if self._last_scan is None:
+            return []
+        scan = self._last_scan
+        n = len(scan.ranges)
+        if n == 0 or scan.angle_increment == 0.0:
+            return []
+        # Convert to radians
+        a_min = scan.angle_min
+        a_inc = scan.angle_increment
+        # Target angles in radians around 0 (front)
+        lo = math.radians(min_deg)
+        hi = math.radians(max_deg)
+        # Compute indices corresponding to [lo, hi]
+        # Index i corresponds to angle a_min + i*a_inc
+        def ang_to_idx(a: float) -> int:
+            i = int(round((a - a_min) / a_inc))
+            return max(0, min(n - 1, i))
+        i0 = ang_to_idx(lo)
+        i1 = ang_to_idx(hi)
+        if i0 > i1:
+            i0, i1 = i1, i0
+        sector = list(scan.ranges[i0:i1 + 1])
+        return self._finite_values(sector)
+
+    @staticmethod
+    def _percentile(vals: List[float], p: float) -> Optional[float]:
+        if not vals:
+            return None
+        vals_sorted = sorted(vals)
+        k = max(0, min(len(vals_sorted) - 1, int(round((p / 100.0) * (len(vals_sorted) - 1)))))
+        return vals_sorted[k]
+
+    def _front_distance_adv(self) -> Optional[float]:
+        """More robust front distance: 10th percentile in +/- front_cone/2."""
+        half = 0.5 * self._front_cone_deg
+        vals = self._sector_values_by_deg(-half, +half)
+        # If angle info is missing or empty, fall back
+        if not vals:
+            return self._front_distance()
+        return self._percentile(vals, 10.0)
+
+    def _side_clearance_adv(self) -> Tuple[Optional[float], Optional[float]]:
+        """Return representative clearances for left/right using side sectors.
+        Uses 30th percentile to reduce outlier influence.
+        """
+        # Left: +inner .. +outer deg | Right: -outer .. -inner deg
+        left_vals = self._sector_values_by_deg(self._side_inner_deg, self._side_outer_deg)
+        right_vals = self._sector_values_by_deg(-self._side_outer_deg, -self._side_inner_deg)
+        left = self._percentile(left_vals, 30.0) if left_vals else None
+        right = self._percentile(right_vals, 30.0) if right_vals else None
+        return left, right
+
     def _side_means(self) -> Tuple[Optional[float], Optional[float]]:
         """Compute average distances for left and right sectors for avoidance."""
         if self._last_scan is None:
@@ -129,6 +199,19 @@ class JetbotAvoider(Node):
         msg.linear.x = float(vx)
         msg.angular.z = float(wz)
         self._cmd_pub.publish(msg)
+
+    # Public stop helper to ensure robot halts on shutdown/interruption
+    def stop_robot(self) -> None:
+        try:
+            self._publish(0.0, 0.0)
+        except Exception:
+            # Best-effort; ignore errors during teardown
+            pass
+
+    # Ensure a stop is sent when the node is destroyed (extra safety)
+    def destroy_node(self) -> bool:  # type: ignore[override]
+        self.stop_robot()
+        return super().destroy_node()
 
     def _set_state(self, new_state: str, reason: Optional[str] = None) -> None:
         if new_state == self._state:
@@ -157,22 +240,44 @@ class JetbotAvoider(Node):
         # Advanced vs simple behavior
         if d_front < self._threshold:
             if self._mode == 'advanced':
-                # Pick the side with larger clearance
-                left_mean, right_mean = self._side_means()
-                if left_mean is None and right_mean is None:
-                    # No info — rotate in place slowly to search
+                # Robust front and side assessments
+                d_front_adv = self._front_distance_adv()
+                left_clear, right_clear = self._side_clearance_adv()
+
+                # If no side info, rotate in place to search
+                if left_clear is None and right_clear is None:
                     self._set_state('avoid_left', 'escaneo insuficiente')
-                    self._publish(0.0, +self._w * 0.6)
+                    self._last_turn_dir = +1
+                    self._avoid_start_sec = self._avoid_start_sec or self._now_sec()
+                    self._publish(0.0, +self._w * self._search_w_factor)
                     return
-                # Prefer the side with greater distance
-                if right_mean is None or (left_mean is not None and left_mean > right_mean):
-                    self._set_state('avoid_left', f'clearance L={left_mean:.2f} R={right_mean if right_mean is not None else float("nan"):.2f}')
-                    # Turn left while creeping forward
-                    self._publish(self._v * 0.3, +self._w)
+
+                # Choose the side with greater clearance
+                if right_clear is None or (left_clear is not None and left_clear > right_clear):
+                    turn_dir = +1  # left
+                    reason = f'clearance L={left_clear:.2f} R={right_clear if right_clear is not None else float("nan"):.2f}'
+                    self._set_state('avoid_left', reason)
                 else:
-                    self._set_state('avoid_right', f'clearance L={left_mean if left_mean is not None else float("nan"):.2f} R={right_mean:.2f}')
-                    # Turn right while creeping forward
-                    self._publish(self._v * 0.3, -self._w)
+                    turn_dir = -1  # right
+                    reason = f'clearance L={left_clear if left_clear is not None else float("nan"):.2f} R={right_clear:.2f}'
+                    self._set_state('avoid_right', reason)
+
+                # Stuck detection: if we've been avoiding for too long with very close front, rotate in place
+                now = self._now_sec()
+                if self._avoid_start_sec is None:
+                    self._avoid_start_sec = now
+                blocked = (d_front_adv if d_front_adv is not None else d_front) < (0.8 * self._threshold)
+                if blocked and (now - self._avoid_start_sec) > self._stuck_timeout:
+                    # Try rotate-in-place to break free; alternate direction next time
+                    self._publish(0.0, self._w * turn_dir)
+                    self._last_turn_dir = turn_dir
+                    # Reset timer after a rotate-in-place attempt
+                    self._avoid_start_sec = now
+                    return
+
+                # Normal avoid: creep forward while turning toward chosen side
+                self._publish(self._v * self._creep_factor, self._w * turn_dir)
+                self._last_turn_dir = turn_dir
                 return
             else:
                 # Simple mode: stop
@@ -180,7 +285,20 @@ class JetbotAvoider(Node):
                 self._publish(0.0, 0.0)
                 return
 
-        # No obstacle — go forward
+        # No obstacle — go forward (advanced: add hysteresis so we don't flip-flop)
+        if self._mode == 'advanced':
+            # If we were avoiding, require a bit of extra clearance to resume
+            d_front_adv = self._front_distance_adv()
+            if self._state in ('avoid_left', 'avoid_right') and d_front_adv is not None:
+                if d_front_adv < self._threshold * self._resume_factor:
+                    # Keep avoiding in same direction gently
+                    turn_dir = +1 if self._state == 'avoid_left' else -1
+                    self._publish(self._v * self._creep_factor, self._w * turn_dir)
+                    return
+                # Clear enough — drop back to forward
+            # Reset avoid timer when resuming forward
+            self._avoid_start_sec = None
+
         if self._state != 'forward':
             # Transition log happens in _set_state
             self._set_state('forward')
@@ -191,9 +309,18 @@ class JetbotAvoider(Node):
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = JetbotAvoider()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # On shutdown/interrupt, stop the robot explicitly
+        node.get_logger().info('Apagando nodo: enviando stop a /cmd_vel.')
+        node.stop_robot()
+        # tiny delay to allow message to flush
+        time.sleep(0.05)
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
