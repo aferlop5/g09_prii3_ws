@@ -1,44 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Jetbot obstacle avoidance node.
-
-This ROS 2 node commands the Jetbot to move forward while monitoring the Lidar
-(/scan). If an obstacle is detected closer than a threshold in front of the
-robot, it either stops (simple mode) or tries to avoid it by turning while
-creeping forward (advanced mode).
-
-Topics:
-  - Publishes geometry_msgs/Twist to /cmd_vel
-  - Subscribes sensor_msgs/LaserScan from /scan
-
-Parameters:
-  - linear_speed (float, default: 0.15)   -> forward speed (m/s)
-  - angular_speed (float, default: 0.6)   -> turn speed (rad/s)
-  - obstacle_threshold (float, default: 0.3) -> distance threshold (m)
-  - avoidance_mode (str, default: 'simple') -> 'simple' or 'advanced'
-
-Notes:
-  - QoS: /cmd_vel uses RELIABLE; /scan uses sensor data QoS (BEST_EFFORT).
-  - This node aims to be compatible with jetbot_pro_ros2 (drivers for motors
-    and sensors). It only publishes /cmd_vel and consumes /scan.
-"""
-
 from typing import List, Optional, Tuple
 import math
 import time
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import (
+    QoSProfile,
+    ReliabilityPolicy,
+    HistoryPolicy,
+    qos_profile_sensor_data,
+)
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 
 
 class JetbotAvoider(Node):
-    """ROS2 node to perform basic obstacle avoidance using a Lidar scan."""
+    """ROS 2 node for JetBot obstacle avoidance using a LIDAR."""
 
     def __init__(self) -> None:
         super().__init__('jetbot_obstacle_avoidance')
@@ -50,13 +30,31 @@ class JetbotAvoider(Node):
         self.declare_parameter('avoidance_mode', 'simple')  # 'simple' | 'advanced'
         # Advanced-only sensitivity: detect earlier than threshold (multiplier > 1)
         self.declare_parameter('advanced_detect_factor', 1.3)
+        # Advanced-only: prefer rotate-in-place when close (>=1.0 rotates even before threshold)
+        self.declare_parameter('advanced_rotate_factor', 1.05)
+        # Advanced-only: front cone aperture in degrees (total span)
+        self.declare_parameter('advanced_front_cone_deg', 60.0)
 
         # Resolve params
         self._v = float(self.get_parameter('linear_speed').get_parameter_value().double_value)
         self._w = float(self.get_parameter('angular_speed').get_parameter_value().double_value)
         self._threshold = float(self.get_parameter('obstacle_threshold').get_parameter_value().double_value)
-        self._mode = str(self.get_parameter('avoidance_mode').get_parameter_value().string_value or 'simple').lower()
-        self._adv_detect_factor = float(self.get_parameter('advanced_detect_factor').get_parameter_value().double_value or 1.3)
+        self._mode = str(
+            self.get_parameter('avoidance_mode').get_parameter_value().string_value or 'simple'
+        ).lower()
+        self._adv_detect_factor = float(
+            self.get_parameter('advanced_detect_factor').get_parameter_value().double_value or 1.3
+        )
+        self._rotate_factor = float(
+            self.get_parameter('advanced_rotate_factor').get_parameter_value().double_value or 1.05
+        )
+        try:
+            front_cone_param = float(
+                self.get_parameter('advanced_front_cone_deg').get_parameter_value().double_value
+            )
+        except Exception:
+            front_cone_param = 60.0
+
         if self._mode not in ('simple', 'advanced'):
             self.get_logger().warning("avoidance_mode inválido; usando 'simple'")
             self._mode = 'simple'
@@ -69,21 +67,25 @@ class JetbotAvoider(Node):
             self._w = 0.6
 
         # Publisher (RELIABLE for /cmd_vel)
-        qos_cmd = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST)
+        qos_cmd = QoSProfile(
+            depth=10, reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST
+        )
         self._cmd_pub = self.create_publisher(Twist, '/cmd_vel', qos_cmd)
 
         # Subscriber (sensor data QoS for /scan)
-        self._scan_sub = self.create_subscription(LaserScan, '/scan', self._on_scan, qos_profile_sensor_data)
+        self._scan_sub = self.create_subscription(
+            LaserScan, '/scan', self._on_scan, qos_profile_sensor_data
+        )
 
         # State
-        self._last_scan = None  # type: Optional[LaserScan]
-        self._state = 'forward'  # 'forward' | 'stopped' | 'avoid_left' | 'avoid_right'
-        self._last_turn_dir = +1  # +1 left, -1 right (advanced)
-        self._avoid_start_sec = None  # type: Optional[float]
+        self._last_scan: Optional[LaserScan] = None
+        self._state: str = 'forward'  # 'forward' | 'stopped' | 'avoid_left' | 'avoid_right'
+        self._last_turn_dir: int = +1  # +1 left, -1 right (advanced)
+        self._avoid_start_sec: Optional[float] = None
 
         # Advanced-mode tuning (does not affect simple mode)
         self._resume_factor = 1.25  # need a bit more clearance before resuming forward
-        self._front_cone_deg = 30.0  # degrees around the front to assess obstacle
+        self._front_cone_deg = front_cone_param  # degrees around the front to assess obstacle
         self._side_inner_deg = 40.0  # start of side sector from forward
         self._side_outer_deg = 100.0  # end of side sector
         self._creep_factor = 0.3  # fraction of linear speed while avoiding
@@ -144,6 +146,7 @@ class JetbotAvoider(Node):
         def ang_to_idx(a: float) -> int:
             i = int(round((a - a_min) / a_inc))
             return max(0, min(n - 1, i))
+
         i0 = ang_to_idx(lo)
         i1 = ang_to_idx(hi)
         if i0 > i1:
@@ -189,8 +192,8 @@ class JetbotAvoider(Node):
         n = len(r)
         # Define sectors: right = indices around -90 deg, left = +90 deg
         # As a simple heuristic across many scans, use quarter slices.
-        right_sector = r[n//8 : n//4]  # ~45-90 deg on right
-        left_sector = r[-n//4 : -n//8]  # ~-90 to -45 deg on left (wrap)
+        right_sector = r[n // 8 : n // 4]  # ~45-90 deg on right
+        left_sector = r[-n // 4 : -n // 8]  # ~-90 to -45 deg on left (wrap)
         right_vals = self._finite_values(right_sector)
         left_vals = self._finite_values(left_sector)
         right_mean = sum(right_vals) / len(right_vals) if right_vals else None
@@ -225,9 +228,13 @@ class JetbotAvoider(Node):
         elif new_state == 'stopped':
             self.get_logger().info('Obstáculo detectado — deteniendo.')
         elif new_state == 'avoid_left':
-            self.get_logger().info('Evitando obstáculo — girando a la izquierda.' + (f' ({reason})' if reason else ''))
+            self.get_logger().info(
+                'Evitando obstáculo — girando a la izquierda.' + (f' ({reason})' if reason else '')
+            )
         elif new_state == 'avoid_right':
-            self.get_logger().info('Evitando obstáculo — girando a la derecha.' + (f' ({reason})' if reason else ''))
+            self.get_logger().info(
+                'Evitando obstáculo — girando a la derecha.' + (f' ({reason})' if reason else '')
+            )
 
     # ----------------------- Control loop ------------------------------------
     def _control_loop(self) -> None:
@@ -260,15 +267,28 @@ class JetbotAvoider(Node):
                 # Choose the side with greater clearance
                 if right_clear is None or (left_clear is not None and left_clear > right_clear):
                     turn_dir = +1  # left
-                    reason = f'clearance L={left_clear:.2f} R={right_clear if right_clear is not None else float("nan"):.2f}'
+                    reason = (
+                        f'clearance L={left_clear:.2f} '
+                        f'R={right_clear if right_clear is not None else float("nan"):.2f}'
+                    )
                     self._set_state('avoid_left', reason)
                 else:
                     turn_dir = -1  # right
-                    reason = f'clearance L={left_clear if left_clear is not None else float("nan"):.2f} R={right_clear:.2f}'
+                    reason = (
+                        f'clearance L={left_clear if left_clear is not None else float("nan"):.2f} '
+                        f'R={right_clear:.2f}'
+                    )
                     self._set_state('avoid_right', reason)
 
-                # Stuck detection: if we've been avoiding for too long with very close front, rotate in place
+                # Prefer rotate-in-place when close (tight spaces)
                 now = self._now_sec()
+                if d_check < (self._threshold * self._rotate_factor):
+                    self._avoid_start_sec = self._avoid_start_sec or now
+                    self._publish(0.0, self._w * turn_dir)
+                    self._last_turn_dir = turn_dir
+                    return
+
+                # Stuck detection: if we've been avoiding for too long with very close front, rotate in place
                 if self._avoid_start_sec is None:
                     self._avoid_start_sec = now
                 blocked_front = d_front_adv if d_front_adv is not None else d_front_simple

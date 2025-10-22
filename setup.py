@@ -27,6 +27,7 @@ setup(
             'prii3_turtlesim_node = g09_prii3.prii3_turtlesim_node:main',
             'jetbot_drawer = g09_prii3.jetbot_drawer_node:main',
             'jetbot_obstacle_avoidance = g09_prii3.obstacle_avoidance_node:main',
+            'jetbot_potential_fields = g09_prii3.Potential_Fields:main',
         ],
     },
 )
