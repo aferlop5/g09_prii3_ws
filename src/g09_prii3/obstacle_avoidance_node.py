@@ -48,12 +48,15 @@ class JetbotAvoider(Node):
         self.declare_parameter('angular_speed', 0.6)
         self.declare_parameter('obstacle_threshold', 0.3)
         self.declare_parameter('avoidance_mode', 'simple')  # 'simple' | 'advanced'
+        # Advanced-only sensitivity: detect earlier than threshold (multiplier > 1)
+        self.declare_parameter('advanced_detect_factor', 1.3)
 
         # Resolve params
         self._v = float(self.get_parameter('linear_speed').get_parameter_value().double_value)
         self._w = float(self.get_parameter('angular_speed').get_parameter_value().double_value)
         self._threshold = float(self.get_parameter('obstacle_threshold').get_parameter_value().double_value)
         self._mode = str(self.get_parameter('avoidance_mode').get_parameter_value().string_value or 'simple').lower()
+        self._adv_detect_factor = float(self.get_parameter('advanced_detect_factor').get_parameter_value().double_value or 1.3)
         if self._mode not in ('simple', 'advanced'):
             self.get_logger().warning("avoidance_mode inválido; usando 'simple'")
             self._mode = 'simple'
@@ -87,8 +90,8 @@ class JetbotAvoider(Node):
         self._search_w_factor = 0.8  # fraction of angular speed when searching in place
         self._stuck_timeout = 3.0  # seconds blocked before trying rotate-in-place
 
-        # Control loop at ~10 Hz
-        self._timer = self.create_timer(0.1, self._control_loop)
+        # Control loop at ~20 Hz (más correcciones por segundo)
+        self._timer = self.create_timer(0.05, self._control_loop)
 
         self.get_logger().info(
             f'JetbotAvoider listo. Modo: {self._mode} | v={self._v:.2f} m/s, w={self._w:.2f} rad/s, threshold={self._threshold:.2f} m'
@@ -228,20 +231,22 @@ class JetbotAvoider(Node):
 
     # ----------------------- Control loop ------------------------------------
     def _control_loop(self) -> None:
-        # Determine front distance
-        d_front = self._front_distance()
+        # Determine front distance (simple baseline)
+        d_front_simple = self._front_distance()
 
-        if d_front is None:
+        if d_front_simple is None:
             # No scan yet — just be conservative: slow forward
             self._set_state('forward')
             self._publish(self._v * 0.5, 0.0)
             return
 
         # Advanced vs simple behavior
-        if d_front < self._threshold:
-            if self._mode == 'advanced':
+        if self._mode == 'advanced':
+            # Detect earlier in advanced mode using robust front and a multiplier
+            d_front_adv = self._front_distance_adv()
+            d_check = d_front_adv if d_front_adv is not None else d_front_simple
+            if d_check is not None and d_check < (self._threshold * self._adv_detect_factor):
                 # Robust front and side assessments
-                d_front_adv = self._front_distance_adv()
                 left_clear, right_clear = self._side_clearance_adv()
 
                 # If no side info, rotate in place to search
@@ -266,7 +271,8 @@ class JetbotAvoider(Node):
                 now = self._now_sec()
                 if self._avoid_start_sec is None:
                     self._avoid_start_sec = now
-                blocked = (d_front_adv if d_front_adv is not None else d_front) < (0.8 * self._threshold)
+                blocked_front = d_front_adv if d_front_adv is not None else d_front_simple
+                blocked = (blocked_front is not None) and (blocked_front < (0.8 * self._threshold))
                 if blocked and (now - self._avoid_start_sec) > self._stuck_timeout:
                     # Try rotate-in-place to break free; alternate direction next time
                     self._publish(0.0, self._w * turn_dir)
@@ -279,8 +285,9 @@ class JetbotAvoider(Node):
                 self._publish(self._v * self._creep_factor, self._w * turn_dir)
                 self._last_turn_dir = turn_dir
                 return
-            else:
-                # Simple mode: stop
+        else:
+            # Simple mode detection as before
+            if d_front_simple < self._threshold:
                 self._set_state('stopped')
                 self._publish(0.0, 0.0)
                 return
