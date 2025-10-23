@@ -19,6 +19,8 @@ def generate_launch_description() -> LaunchDescription:
 	odom_topic = DeclareLaunchArgument('odom_topic', default_value='/odom')
 	scan_topic = DeclareLaunchArgument('scan_topic', default_value='/scan')
 	cmd_vel_topic = DeclareLaunchArgument('cmd_vel_topic', default_value='/cmd_vel')
+	goal_mode = DeclareLaunchArgument('goal_mode', default_value='auto')
+	use_sim_time = DeclareLaunchArgument('use_sim_time', default_value='false')
 	ang_gain = DeclareLaunchArgument('ang_gain', default_value='1.5')
 	lin_gain = DeclareLaunchArgument('lin_gain', default_value='1.0')
 	slowdown_min_scale = DeclareLaunchArgument('slowdown_min_scale', default_value='0.18')
@@ -47,6 +49,8 @@ def generate_launch_description() -> LaunchDescription:
 			'odom_topic': LaunchConfiguration('odom_topic'),
 			'scan_topic': LaunchConfiguration('scan_topic'),
 			'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
+			'goal_mode': LaunchConfiguration('goal_mode'),
+			'use_sim_time': ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool),
 			'ang_gain': ParameterValue(LaunchConfiguration('ang_gain'), value_type=float),
 			'lin_gain': ParameterValue(LaunchConfiguration('lin_gain'), value_type=float),
 			'slowdown_min_scale': ParameterValue(LaunchConfiguration('slowdown_min_scale'), value_type=float),
@@ -85,5 +89,7 @@ def generate_launch_description() -> LaunchDescription:
 		cmd_vel_topic,
 		stuck_timeout,
 		pf_node,
+		goal_mode,
+		use_sim_time,
 	])
 

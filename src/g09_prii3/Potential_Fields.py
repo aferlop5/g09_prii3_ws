@@ -48,6 +48,10 @@ class PotentialFieldsNavigator(Node):
         self.declare_parameter('scan_angle_offset_deg', 0.0)
         # Detección de estancamiento (tiempo sin progreso hacia la meta)
         self.declare_parameter('stuck_timeout', 3.0)
+        # Modo de objetivo: 'auto' (relativo si no hay sim), 'relative' (objetivo en el frame inicial del robot), 'absolute' (objetivo en odom)
+        self.declare_parameter('goal_mode', 'auto')
+        # Declarar use_sim_time para poder detectar simulación (puede ser establecido por launch)
+        self.declare_parameter('use_sim_time', False)
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -70,6 +74,17 @@ class PotentialFieldsNavigator(Node):
         self.smooth_alpha = max(0.0, min(1.0, self.get_parameter('smooth_alpha').value))
         self.scan_angle_offset_deg = self.get_parameter('scan_angle_offset_deg').value
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
+        self.goal_mode = str(self.get_parameter('goal_mode').value)
+        use_sim_time_param = self.get_parameter('use_sim_time').value
+        self.use_sim_time = bool(use_sim_time_param) if use_sim_time_param is not None else False
+
+        # Determinar si usamos objetivo relativo
+        if self.goal_mode == 'relative':
+            self.use_relative_goal = True
+        elif self.goal_mode == 'absolute':
+            self.use_relative_goal = False
+        else:  # 'auto'
+            self.use_relative_goal = not self.use_sim_time
 
         # Usar QoS de datos de sensor para compatibilidad con drivers de hardware (best effort)
         self.sub_scan = self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, qos_profile_sensor_data)
@@ -92,6 +107,15 @@ class PotentialFieldsNavigator(Node):
 
         self.create_timer(0.05, self.control_loop)
 
+        # Variables para objetivo relativo anclado a la pose inicial
+        self.init_pose_set = False
+        self.init_x = 0.0
+        self.init_y = 0.0
+        self.init_yaw = 0.0
+        self.goal_world_set = False
+        self.goal_world_x = self.goal_x
+        self.goal_world_y = self.goal_y
+
     def scan_callback(self, msg: LaserScan):
         self.last_scan = msg
 
@@ -105,12 +129,34 @@ class PotentialFieldsNavigator(Node):
         self.robot_yaw = float(yaw)
         self.odom_received = True
 
+        # Capturar pose inicial y fijar objetivo en mundo si usamos modo relativo
+        if self.use_relative_goal and not self.init_pose_set:
+            self.init_x = self.robot_x
+            self.init_y = self.robot_y
+            self.init_yaw = self.robot_yaw
+            self.init_pose_set = True
+            # Convertir objetivo relativo (frame inicial del robot) a odom
+            gx_rel, gy_rel = self.goal_x, self.goal_y
+            cy0 = math.cos(self.init_yaw)
+            sy0 = math.sin(self.init_yaw)
+            gx_w = self.init_x + gx_rel * cy0 - gy_rel * sy0
+            gy_w = self.init_y + gx_rel * sy0 + gy_rel * cy0
+            self.goal_world_x = gx_w
+            self.goal_world_y = gy_w
+            self.goal_world_set = True
+
     def compute_force_vector(self):
         # Si aún no hay láser, aplicamos solo fuerza atractiva hacia la meta
         if self.last_scan is None:
             if self.odom_received:
-                dx_w = self.goal_x - self.robot_x
-                dy_w = self.goal_y - self.robot_y
+                if self.use_relative_goal and self.goal_world_set:
+                    gx_w = self.goal_world_x
+                    gy_w = self.goal_world_y
+                else:
+                    gx_w = self.goal_x
+                    gy_w = self.goal_y
+                dx_w = gx_w - self.robot_x
+                dy_w = gy_w - self.robot_y
                 cy = math.cos(self.robot_yaw)
                 sy = math.sin(self.robot_yaw)
                 dx = dx_w * cy + dy_w * sy
@@ -135,8 +181,16 @@ class PotentialFieldsNavigator(Node):
 
         # campo atractivo hacia meta (usar odometría si está disponible)
         if self.odom_received:
-            dx_w = self.goal_x - self.robot_x
-            dy_w = self.goal_y - self.robot_y
+            # Elegir objetivo en odom (absoluto o relativo-anclado)
+            if self.use_relative_goal and self.goal_world_set:
+                gx_w = self.goal_world_x
+                gy_w = self.goal_world_y
+            else:
+                gx_w = self.goal_x
+                gy_w = self.goal_y
+
+            dx_w = gx_w - self.robot_x
+            dy_w = gy_w - self.robot_y
             # Transformar a frame del robot (rotación -yaw)
             cy = math.cos(self.robot_yaw)
             sy = math.sin(self.robot_yaw)
@@ -195,7 +249,13 @@ class PotentialFieldsNavigator(Node):
 
         # Si estamos cerca de la meta, anular fuerzas para evitar oscilaciones
         if self.odom_received:
-            dist_goal = math.hypot(self.goal_x - self.robot_x, self.goal_y - self.robot_y)
+            if self.use_relative_goal and self.goal_world_set:
+                gx_w = self.goal_world_x
+                gy_w = self.goal_world_y
+            else:
+                gx_w = self.goal_x
+                gy_w = self.goal_y
+            dist_goal = math.hypot(gx_w - self.robot_x, gy_w - self.robot_y)
             if dist_goal <= self.goal_tolerance:
                 F = np.array([0.0, 0.0])
                 if not self.reached_goal_logged:
@@ -251,7 +311,13 @@ class PotentialFieldsNavigator(Node):
         # Detección de estancamiento y recuperación (spin-in-place)
         now = self.get_clock().now().nanoseconds * 1e-9
         if self.odom_received:
-            dist_goal = math.hypot(self.goal_x - self.robot_x, self.goal_y - self.robot_y)
+            if self.use_relative_goal and self.goal_world_set:
+                gx_w = self.goal_world_x
+                gy_w = self.goal_world_y
+            else:
+                gx_w = self.goal_x
+                gy_w = self.goal_y
+            dist_goal = math.hypot(gx_w - self.robot_x, gy_w - self.robot_y)
             # progreso si disminuye la distancia de forma apreciable
             if dist_goal < self.last_goal_dist - 0.01:
                 self.last_progress_time = now
@@ -292,6 +358,13 @@ class PotentialFieldsNavigator(Node):
     def update_goal(self, x, y):
         self.goal_x = x
         self.goal_y = y
+        # Recalcular objetivo en mundo si estamos en modo relativo y ya tenemos pose inicial
+        if self.use_relative_goal and self.init_pose_set:
+            cy0 = math.cos(self.init_yaw)
+            sy0 = math.sin(self.init_yaw)
+            self.goal_world_x = self.init_x + x * cy0 - y * sy0
+            self.goal_world_y = self.init_y + x * sy0 + y * cy0
+            self.goal_world_set = True
         self.get_logger().info(f"Nuevo objetivo: ({x:.2f}, {y:.2f})")
 
 def main(args=None):
