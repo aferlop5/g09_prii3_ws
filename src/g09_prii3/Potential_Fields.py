@@ -35,13 +35,13 @@ class PotentialFieldsNavigator(Node):
         self.declare_parameter('ang_gain', 1.5)
         self.declare_parameter('lin_gain', 1.0)
         # Escalado de velocidad cerca de obstáculos (min ratio)
-        self.declare_parameter('slowdown_min_scale', 0.2)
+        self.declare_parameter('slowdown_min_scale', 0.4)
         # Ponderación angular del repulsivo y suavizado de comandos
         self.declare_parameter('front_weight_deg', 60.0)
         self.declare_parameter('rep_scale_side', 0.3)
         self.declare_parameter('smooth_alpha', 0.3)
         # Detección de estancamiento (tiempo sin progreso hacia la meta)
-        self.declare_parameter('stuck_timeout', 3.0)
+        self.declare_parameter('stuck_timeout', 5.0)
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -81,6 +81,24 @@ class PotentialFieldsNavigator(Node):
         self.last_progress_time = self.get_clock().now().nanoseconds * 1e-9
 
         self.create_timer(0.05, self.control_loop)
+
+    # Public stop helper to ensure robot halts on shutdown/interruption
+    def stop_robot(self):
+        try:
+            zero = Twist()
+            zero.linear.x = 0.0
+            zero.angular.z = 0.0
+            self.pub_cmd.publish(zero)
+        except Exception:
+            # Best-effort during teardown
+            pass
+
+    # Ensure a stop is sent when the node is destroyed (extra safety)
+    def destroy_node(self):  # type: ignore[override]
+        try:
+            self.stop_robot()
+        finally:
+            return super().destroy_node()
 
     def scan_callback(self, msg: LaserScan):
         self.last_scan = msg
@@ -284,9 +302,18 @@ class PotentialFieldsNavigator(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = PotentialFieldsNavigator()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # On shutdown/interrupt, stop the robot explicitly
+        node.get_logger().info('Apagando nodo de campos potenciales: enviando stop a /cmd_vel.')
+        node.stop_robot()
+        # tiny delay to allow message to flush
+        time.sleep(0.05)
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
