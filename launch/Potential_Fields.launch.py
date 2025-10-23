@@ -78,6 +78,8 @@ def generate_launch_description() -> LaunchDescription:
 		goal_y,
 		goal_tolerance,
 		odom_topic,
+		goal_mode,
+		use_sim_time,
 		ang_gain,
 		lin_gain,
 		slowdown_min_scale,
@@ -89,7 +91,5 @@ def generate_launch_description() -> LaunchDescription:
 		cmd_vel_topic,
 		stuck_timeout,
 		pf_node,
-		goal_mode,
-		use_sim_time,
 	])
 
