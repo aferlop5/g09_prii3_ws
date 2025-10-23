@@ -36,7 +36,8 @@ g09_prii3_ws/
 │     ├─ prii3_turtlesim_node.py
 │     ├─ drawer_number_gazebo.py
 │     ├─ jetbot_drawer_node.py
-│     └─ obstacle_avoidance_node.py
+│     ├─ obstacle_avoidance_node.py
+│     └─ Potential_Fields.py
 ├─ package.xml
 ├─ setup.py
 ├─ setup.cfg
@@ -262,6 +263,11 @@ ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.80 goal_y:=-0.03
 Perfil rápido puerta‑friendly (recomendado para puertas/pasillos)
 ```bash
 ros2 launch g09_prii3 Potential_Fields_door_fast.launch.py goal_x:=1.80 goal_y:=-0.03
+```
+
+Ejemplo real (valores usados en pruebas)
+```bash
+ros2 launch g09_prii3 Potential_Fields_door_fast.launch.py goal_x:=-6.357 goal_y:=-2.92
 ```
 
 Parámetros principales
