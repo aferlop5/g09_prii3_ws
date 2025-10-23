@@ -17,6 +17,8 @@ def generate_launch_description() -> LaunchDescription:
 	goal_y = DeclareLaunchArgument('goal_y', default_value='0.0')
 	goal_tolerance = DeclareLaunchArgument('goal_tolerance', default_value='0.1')
 	odom_topic = DeclareLaunchArgument('odom_topic', default_value='/odom')
+	scan_topic = DeclareLaunchArgument('scan_topic', default_value='/scan')
+	cmd_vel_topic = DeclareLaunchArgument('cmd_vel_topic', default_value='/cmd_vel')
 	ang_gain = DeclareLaunchArgument('ang_gain', default_value='1.5')
 	lin_gain = DeclareLaunchArgument('lin_gain', default_value='1.0')
 	slowdown_min_scale = DeclareLaunchArgument('slowdown_min_scale', default_value='0.18')
@@ -24,6 +26,7 @@ def generate_launch_description() -> LaunchDescription:
 	front_weight_deg = DeclareLaunchArgument('front_weight_deg', default_value='60.0')
 	rep_scale_side = DeclareLaunchArgument('rep_scale_side', default_value='0.20')
 	smooth_alpha = DeclareLaunchArgument('smooth_alpha', default_value='0.3')
+	scan_angle_offset_deg = DeclareLaunchArgument('scan_angle_offset_deg', default_value='0.0')
 	stuck_timeout = DeclareLaunchArgument('stuck_timeout', default_value='3.0')
 
 	pf_node = Node(
@@ -42,12 +45,15 @@ def generate_launch_description() -> LaunchDescription:
 			'goal_y': ParameterValue(LaunchConfiguration('goal_y'), value_type=float),
 			'goal_tolerance': ParameterValue(LaunchConfiguration('goal_tolerance'), value_type=float),
 			'odom_topic': LaunchConfiguration('odom_topic'),
+			'scan_topic': LaunchConfiguration('scan_topic'),
+			'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
 			'ang_gain': ParameterValue(LaunchConfiguration('ang_gain'), value_type=float),
 			'lin_gain': ParameterValue(LaunchConfiguration('lin_gain'), value_type=float),
 			'slowdown_min_scale': ParameterValue(LaunchConfiguration('slowdown_min_scale'), value_type=float),
 			'front_weight_deg': ParameterValue(LaunchConfiguration('front_weight_deg'), value_type=float),
 			'rep_scale_side': ParameterValue(LaunchConfiguration('rep_scale_side'), value_type=float),
 			'smooth_alpha': ParameterValue(LaunchConfiguration('smooth_alpha'), value_type=float),
+			'scan_angle_offset_deg': ParameterValue(LaunchConfiguration('scan_angle_offset_deg'), value_type=float),
 			'stuck_timeout': ParameterValue(LaunchConfiguration('stuck_timeout'), value_type=float),
 		}],
 		# Remappings (uncomment if your topics differ)
@@ -74,6 +80,9 @@ def generate_launch_description() -> LaunchDescription:
 		front_weight_deg,
 		rep_scale_side,
 		smooth_alpha,
+		scan_angle_offset_deg,
+		scan_topic,
+		cmd_vel_topic,
 		stuck_timeout,
 		pf_node,
 	])

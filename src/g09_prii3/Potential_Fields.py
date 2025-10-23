@@ -6,6 +6,7 @@ from nav_msgs.msg import Odometry
 import math
 import numpy as np
 import time
+from rclpy.qos import qos_profile_sensor_data
 
 # Minimal local implementation for yaw extraction from quaternion to avoid external deps here
 def euler_from_quaternion(q):
@@ -31,6 +32,9 @@ class PotentialFieldsNavigator(Node):
         # Parámetros nuevos
         self.declare_parameter('goal_tolerance', 0.1)
         self.declare_parameter('odom_topic', '/odom')
+        # Tópicos configurables para hardware real
+        self.declare_parameter('scan_topic', '/scan')
+        self.declare_parameter('cmd_vel_topic', '/cmd_vel')
         # Ganancias de control
         self.declare_parameter('ang_gain', 1.5)
         self.declare_parameter('lin_gain', 1.0)
@@ -40,6 +44,8 @@ class PotentialFieldsNavigator(Node):
         self.declare_parameter('front_weight_deg', 50.0)
         self.declare_parameter('rep_scale_side', 0.3)
         self.declare_parameter('smooth_alpha', 0.3)
+        # Compensación por montaje del láser (grados, 0 si mira exactamente al frente)
+        self.declare_parameter('scan_angle_offset_deg', 0.0)
         # Detección de estancamiento (tiempo sin progreso hacia la meta)
         self.declare_parameter('stuck_timeout', 3.0)
 
@@ -54,17 +60,21 @@ class PotentialFieldsNavigator(Node):
         self.goal_y = self.get_parameter('goal_y').value
         self.goal_tolerance = self.get_parameter('goal_tolerance').value
         self.odom_topic = self.get_parameter('odom_topic').value
+        self.scan_topic = self.get_parameter('scan_topic').value
+        self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         self.ang_gain = self.get_parameter('ang_gain').value
         self.lin_gain = self.get_parameter('lin_gain').value
         self.slowdown_min_scale = self.get_parameter('slowdown_min_scale').value
         self.front_weight_deg = self.get_parameter('front_weight_deg').value
         self.rep_scale_side = self.get_parameter('rep_scale_side').value
         self.smooth_alpha = max(0.0, min(1.0, self.get_parameter('smooth_alpha').value))
+        self.scan_angle_offset_deg = self.get_parameter('scan_angle_offset_deg').value
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
 
-        self.sub_scan = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
+        # Usar QoS de datos de sensor para compatibilidad con drivers de hardware (best effort)
+        self.sub_scan = self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, qos_profile_sensor_data)
         self.sub_odom = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
-        self.pub_cmd = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.pub_cmd = self.create_publisher(Twist, self.cmd_vel_topic, 10)
 
         self.last_scan = None
         self.robot_x = 0.0
@@ -153,6 +163,7 @@ class PotentialFieldsNavigator(Node):
             a_max = float(angles.max())
             bin_edges = np.linspace(a_min, a_max, rep_bins + 1)
             front_rad = math.radians(self.front_weight_deg)
+            angle_off = math.radians(float(self.scan_angle_offset_deg))
             for i in range(rep_bins):
                 a0 = bin_edges[i]
                 a1 = bin_edges[i + 1]
@@ -163,21 +174,23 @@ class PotentialFieldsNavigator(Node):
                 # Filtrar por debajo de d0 para contribución
                 r_eff = np.percentile(r_bin, p)
                 theta = 0.5 * (a0 + a1)
+                # Compensar offset de montaje del sensor
+                theta_adj = theta + angle_off
                 if r_eff < self.d0:
                     # Ponderación angular: más peso en el frontal
                     w_ang = 1.0
-                    if abs(theta) <= front_rad:
-                        w_ang = max(0.0, math.cos(theta))  # [0..1] en frontal
+                    if abs(theta_adj) <= front_rad:
+                        w_ang = max(0.0, math.cos(theta_adj))  # [0..1] en frontal
                     else:
-                        w_ang = self.rep_scale_side * max(0.0, math.cos(theta))
+                        w_ang = self.rep_scale_side * max(0.0, math.cos(theta_adj))
 
                     if w_ang <= 0.0:
                         continue
 
                     magnitude = self.k_rep * (1.0 / r_eff - 1.0 / self.d0) * (1.0 / (r_eff * r_eff))
                     magnitude *= w_ang
-                    ux = -math.cos(theta)
-                    uy = -math.sin(theta)
+                    ux = -math.cos(theta_adj)
+                    uy = -math.sin(theta_adj)
                     F += magnitude * np.array([ux, uy])
 
         # Si estamos cerca de la meta, anular fuerzas para evitar oscilaciones
