@@ -8,8 +8,8 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description() -> LaunchDescription:
 	# Launch parameters with sane defaults matching node's internal defaults
 	k_att = DeclareLaunchArgument('k_att', default_value='1.0')
-	k_rep = DeclareLaunchArgument('k_rep', default_value='0.28')
-	d0_rep = DeclareLaunchArgument('d0_rep', default_value='0.40')
+	k_rep = DeclareLaunchArgument('k_rep', default_value='0.20')
+	d0_rep = DeclareLaunchArgument('d0_rep', default_value='0.30')
 	max_lin_vel = DeclareLaunchArgument('max_lin_vel', default_value='0.3')
 	max_ang_vel = DeclareLaunchArgument('max_ang_vel', default_value='1.0')
 	escape_gain = DeclareLaunchArgument('escape_gain', default_value='0.2')
@@ -21,8 +21,8 @@ def generate_launch_description() -> LaunchDescription:
 	lin_gain = DeclareLaunchArgument('lin_gain', default_value='1.0')
 	slowdown_min_scale = DeclareLaunchArgument('slowdown_min_scale', default_value='0.18')
 	# Aumentar prioridad frontal y dar más peso a laterales para mayor holgura al girar
-	front_weight_deg = DeclareLaunchArgument('front_weight_deg', default_value='60.0')
-	rep_scale_side = DeclareLaunchArgument('rep_scale_side', default_value='0.20')
+	front_weight_deg = DeclareLaunchArgument('front_weight_deg', default_value='50.0')
+	rep_scale_side = DeclareLaunchArgument('rep_scale_side', default_value='0.10')
 	smooth_alpha = DeclareLaunchArgument('smooth_alpha', default_value='0.3')
 	stuck_timeout = DeclareLaunchArgument('stuck_timeout', default_value='3.0')
 
