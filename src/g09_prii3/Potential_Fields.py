@@ -50,8 +50,7 @@ class PotentialFieldsNavigator(Node):
         self.declare_parameter('stuck_timeout', 3.0)
         # Modo de objetivo: 'auto' (relativo si no hay sim), 'relative' (objetivo en el frame inicial del robot), 'absolute' (objetivo en odom)
         self.declare_parameter('goal_mode', 'auto')
-        # Declarar use_sim_time para poder detectar simulación (puede ser establecido por launch)
-        self.declare_parameter('use_sim_time', False)
+        # Nota: use_sim_time es un parámetro especial; no lo declaramos para evitar conflictos si ya lo declara el sistema
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -75,8 +74,14 @@ class PotentialFieldsNavigator(Node):
         self.scan_angle_offset_deg = self.get_parameter('scan_angle_offset_deg').value
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
         self.goal_mode = str(self.get_parameter('goal_mode').value)
-        use_sim_time_param = self.get_parameter('use_sim_time').value
-        self.use_sim_time = bool(use_sim_time_param) if use_sim_time_param is not None else False
+        # Leer use_sim_time si existe; si no, asumir False
+        use_sim_time_param = False
+        try:
+            if self.has_parameter('use_sim_time'):
+                use_sim_time_param = self.get_parameter('use_sim_time').value
+        except Exception:
+            use_sim_time_param = False
+        self.use_sim_time = bool(use_sim_time_param)
 
         # Determinar si usamos objetivo relativo
         if self.goal_mode == 'relative':
