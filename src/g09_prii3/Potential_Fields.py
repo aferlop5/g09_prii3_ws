@@ -21,8 +21,8 @@ class PotentialFieldsNavigator(Node):
         super().__init__('potential_fields_nav')
         self.declare_parameter('k_att', 1.0)
         # Ajustes más "apurados": menor alcance y menor ganancia repulsiva por defecto
-        self.declare_parameter('k_rep', 0.3)
-        self.declare_parameter('d0_rep', 0.5)
+        self.declare_parameter('k_rep', 0.22)
+        self.declare_parameter('d0_rep', 0.4)
         self.declare_parameter('max_lin_vel', 0.3)
         self.declare_parameter('max_ang_vel', 1.0)
         self.declare_parameter('escape_gain', 0.2)
@@ -37,7 +37,7 @@ class PotentialFieldsNavigator(Node):
         # Escalado de velocidad cerca de obstáculos (min ratio)
         self.declare_parameter('slowdown_min_scale', 0.2)
         # Ponderación angular del repulsivo y suavizado de comandos
-        self.declare_parameter('front_weight_deg', 60.0)
+        self.declare_parameter('front_weight_deg', 50.0)
         self.declare_parameter('rep_scale_side', 0.3)
         self.declare_parameter('smooth_alpha', 0.3)
         # Detección de estancamiento (tiempo sin progreso hacia la meta)
