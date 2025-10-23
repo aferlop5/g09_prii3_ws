@@ -8,21 +8,21 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description() -> LaunchDescription:
 	# Ganancia atractiva hacia la meta (más alto = más "tirón" hacia el objetivo)
 	# Sube si el robot tarda en orientar/dirigirse a la meta; baja si ignora obstáculos al insistir demasiado en la meta
-	k_att = DeclareLaunchArgument('k_att', default_value='1.3')
+	k_att = DeclareLaunchArgument('k_att', default_value='1.0')
 
 	# Ganancia repulsiva de obstáculos (más alto = se aleja más fuerte de obstáculos)
 	# Sube si roza objetos; baja si se vuelve demasiado conservador y avanza poco
-	k_rep = DeclareLaunchArgument('k_rep', default_value='0.30')
+	k_rep = DeclareLaunchArgument('k_rep', default_value='0.32')
 
 	# Distancia de influencia del campo repulsivo (m). Por debajo de esta distancia comienzan las fuerzas de repulsión
 	# Sube si quieres empezar a evitar antes (más margen); baja si quieres arrimarte más
 	d0_rep = DeclareLaunchArgument('d0_rep', default_value='0.55')
 
 	# Saturación de velocidad lineal (m/s). Límite superior del comando de avance
-	max_lin_vel = DeclareLaunchArgument('max_lin_vel', default_value='0.5')
+	max_lin_vel = DeclareLaunchArgument('max_lin_vel', default_value='0.3')
 
 	# Saturación de velocidad angular (rad/s). Límite superior del giro
-	max_ang_vel = DeclareLaunchArgument('max_ang_vel', default_value='1.5')
+	max_ang_vel = DeclareLaunchArgument('max_ang_vel', default_value='1.0')
 
 	# Magnitud de una pequeña perturbación de escape cuando el campo se queda casi nulo (mínimos locales)
 	# Sube si a veces se "atasca" oscilando; baja si introduce giros innecesarios
@@ -42,11 +42,11 @@ def generate_launch_description() -> LaunchDescription:
 	ang_gain = DeclareLaunchArgument('ang_gain', default_value='1.5')
 
 	# Ganancia que convierte la magnitud del vector en velocidad lineal (más alto = acelera más ante el mismo campo)
-	lin_gain = DeclareLaunchArgument('lin_gain', default_value='1.2')
+	lin_gain = DeclareLaunchArgument('lin_gain', default_value='1.0')
 
 	# Factor mínimo de reducción de la velocidad cerca de obstáculos [0..1]
 	# La velocidad lineal se escala con la distancia al obstáculo; este valor evita que caiga por debajo de un mínimo
-	slowdown_min_scale = DeclareLaunchArgument('slowdown_min_scale', default_value='0.18')
+	slowdown_min_scale = DeclareLaunchArgument('slowdown_min_scale', default_value='0.2')
 
 	# Anchura (grados) del sector frontal con mayor prioridad repulsiva
 	# Sube para que "mire" más al frente y evite con más decisión lo que hay delante; baja para equilibrar laterales
@@ -58,10 +58,24 @@ def generate_launch_description() -> LaunchDescription:
 
 	# Suavizado de comandos (filtro paso bajo). 0 = muy suave/lento, 1 = sin suavizado (muy reactivo)
 	# Sube para que responda más rápido; baja para movimientos más suaves y estables
-	smooth_alpha = DeclareLaunchArgument('smooth_alpha', default_value='0.3')
+	smooth_alpha = DeclareLaunchArgument('smooth_alpha', default_value='0.4')
 
 	# Tiempo (s) sin progreso hacia la meta para activar recuperación (giro en el sitio)
-	stuck_timeout = DeclareLaunchArgument('stuck_timeout', default_value='5.0')
+	stuck_timeout = DeclareLaunchArgument('stuck_timeout', default_value='3.0')
+
+	# --- Fallback de atascos: seguir aperturas (Follow-The-Gap) ---
+	# Activa el modo de elegir la mayor apertura cuando no hay progreso
+	use_gap_follow = DeclareLaunchArgument('use_gap_follow', default_value='true')
+	# Distancia mínima considerada "libre" para formar una apertura (si dudas, usa d0_rep)
+	gap_clear_threshold = DeclareLaunchArgument('gap_clear_threshold', default_value=LaunchConfiguration('d0_rep'))
+	# Anchura mínima (en grados) de una apertura válida (puerta/paso)
+	gap_min_width_deg = DeclareLaunchArgument('gap_min_width_deg', default_value='12.0')
+	# Peso de preferencia hacia la dirección de la meta frente a la apertura (0..1)
+	gap_prefer_goal_weight = DeclareLaunchArgument('gap_prefer_goal_weight', default_value='0.6')
+	# Modo de recuperación cuando está atascado: 'gap' | 'spin' | 'spin+gap'
+	recovery_mode = DeclareLaunchArgument('recovery_mode', default_value='spin+gap')
+	# Duración (s) de seguimiento de apertura antes de re-evaluar
+	recovery_gap_duration = DeclareLaunchArgument('recovery_gap_duration', default_value='3.0')
 
 	pf_node = Node(
 		package='g09_prii3',
@@ -85,7 +99,13 @@ def generate_launch_description() -> LaunchDescription:
 			'front_weight_deg': ParameterValue(LaunchConfiguration('front_weight_deg'), value_type=float),
 			'rep_scale_side': ParameterValue(LaunchConfiguration('rep_scale_side'), value_type=float),
 			'smooth_alpha': ParameterValue(LaunchConfiguration('smooth_alpha'), value_type=float),
-			'stuck_timeout': ParameterValue(LaunchConfiguration('stuck_timeout'), value_type=float),
+				'stuck_timeout': ParameterValue(LaunchConfiguration('stuck_timeout'), value_type=float),
+				'use_gap_follow': ParameterValue(LaunchConfiguration('use_gap_follow'), value_type=bool),
+				'gap_clear_threshold': ParameterValue(LaunchConfiguration('gap_clear_threshold'), value_type=float),
+				'gap_min_width_deg': ParameterValue(LaunchConfiguration('gap_min_width_deg'), value_type=float),
+				'gap_prefer_goal_weight': ParameterValue(LaunchConfiguration('gap_prefer_goal_weight'), value_type=float),
+				'recovery_mode': LaunchConfiguration('recovery_mode'),
+				'recovery_gap_duration': ParameterValue(LaunchConfiguration('recovery_gap_duration'), value_type=float),
 		}],
 		# Remappings (uncomment if your topics differ)
 		# remappings=[
@@ -112,6 +132,12 @@ def generate_launch_description() -> LaunchDescription:
 		rep_scale_side,
 		smooth_alpha,
 		stuck_timeout,
+		use_gap_follow,
+		gap_clear_threshold,
+		gap_min_width_deg,
+		gap_prefer_goal_weight,
+		recovery_mode,
+		recovery_gap_duration,
 		pf_node,
 	])
 

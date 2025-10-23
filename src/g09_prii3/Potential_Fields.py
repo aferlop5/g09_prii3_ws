@@ -21,8 +21,8 @@ class PotentialFieldsNavigator(Node):
         super().__init__('potential_fields_nav')
         self.declare_parameter('k_att', 1.0)
         # Ajustes más "apurados": menor alcance y menor ganancia repulsiva por defecto
-        self.declare_parameter('k_rep', 0.3)
-        self.declare_parameter('d0_rep', 0.5)
+        self.declare_parameter('k_rep', 0.32)
+        self.declare_parameter('d0_rep', 0.55)
         self.declare_parameter('max_lin_vel', 0.3)
         self.declare_parameter('max_ang_vel', 1.0)
         self.declare_parameter('escape_gain', 0.2)
@@ -35,13 +35,20 @@ class PotentialFieldsNavigator(Node):
         self.declare_parameter('ang_gain', 1.5)
         self.declare_parameter('lin_gain', 1.0)
         # Escalado de velocidad cerca de obstáculos (min ratio)
-        self.declare_parameter('slowdown_min_scale', 0.4)
+        self.declare_parameter('slowdown_min_scale', 0.2)
         # Ponderación angular del repulsivo y suavizado de comandos
-        self.declare_parameter('front_weight_deg', 60.0)
-        self.declare_parameter('rep_scale_side', 0.3)
-        self.declare_parameter('smooth_alpha', 0.3)
+        self.declare_parameter('front_weight_deg', 80.0)
+        self.declare_parameter('rep_scale_side', 0.42)
+        self.declare_parameter('smooth_alpha', 0.4)
         # Detección de estancamiento (tiempo sin progreso hacia la meta)
-        self.declare_parameter('stuck_timeout', 5.0)
+        self.declare_parameter('stuck_timeout', 3.0)
+        # Fallback para atascos: seguir la mayor apertura (Follow-The-Gap)
+        self.declare_parameter('use_gap_follow', True)
+        self.declare_parameter('gap_clear_threshold', 0.55)  # m; si None usa d0_rep
+        self.declare_parameter('gap_min_width_deg', 12.0)
+        self.declare_parameter('gap_prefer_goal_weight', 0.6)  # [0..1] 1=todo objetivo, 0=solo apertura más grande
+        self.declare_parameter('recovery_mode', 'spin+gap')  # 'spin' | 'gap' | 'spin+gap'
+        self.declare_parameter('recovery_gap_duration', 3.0)
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -61,6 +68,14 @@ class PotentialFieldsNavigator(Node):
         self.rep_scale_side = self.get_parameter('rep_scale_side').value
         self.smooth_alpha = max(0.0, min(1.0, self.get_parameter('smooth_alpha').value))
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
+        self.use_gap_follow = bool(self.get_parameter('use_gap_follow').value)
+        self.gap_clear_threshold = self.get_parameter('gap_clear_threshold').value
+        if self.gap_clear_threshold is None:
+            self.gap_clear_threshold = self.d0
+        self.gap_min_width_deg = float(self.get_parameter('gap_min_width_deg').value)
+        self.gap_prefer_goal_weight = float(self.get_parameter('gap_prefer_goal_weight').value)
+        self.recovery_mode = str(self.get_parameter('recovery_mode').value or 'gap').lower()
+        self.recovery_gap_duration = float(self.get_parameter('recovery_gap_duration').value)
 
         self.sub_scan = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
         self.sub_odom = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
@@ -79,6 +94,8 @@ class PotentialFieldsNavigator(Node):
         self.recovery_end_time = 0.0
         self.last_goal_dist = float('inf')
         self.last_progress_time = self.get_clock().now().nanoseconds * 1e-9
+        self.in_gap_follow = False
+        self.gap_follow_end_time = 0.0
 
         self.create_timer(0.05, self.control_loop)
 
@@ -286,6 +303,45 @@ class PotentialFieldsNavigator(Node):
                 self.in_recovery = False
 
         # Suavizado de comandos (low-pass)
+        # Gap-follow fallback si estamos en recuperación o sin progreso
+        if self.use_gap_follow and (self.in_recovery or (now - self.last_progress_time > self.stuck_timeout)):
+            if not self.in_gap_follow:
+                self.in_gap_follow = True
+                self.gap_follow_end_time = now + max(1.0, self.recovery_gap_duration)
+            # Elegir un ángulo destino basado en aperturas del láser
+            gap_ok, target_heading = self._select_gap_heading()
+            if gap_ok:
+                # Comandar para orientarse al centro de la apertura y avanzar suave
+                # Mezclar con objetivo según peso para no perder dirección global
+                goal_heading = angle  # ya es el ángulo del vector resultante
+                mixed = self._mix_angles(goal_heading, target_heading, self.gap_prefer_goal_weight)
+                # Control simple: priorizar giro si desalineado
+                heading_err = self._angle_diff(mixed, 0.0)
+                w = max(-self.w_max, min(self.w_max, self.ang_gain * heading_err))
+                v = self.v_max * (0.4 if abs(heading_err) > math.pi/6 else 0.6)
+                # Suavizado de comandos (low-pass)
+                self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
+                self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
+                cmd = Twist()
+                cmd.linear.x = float(self.v_filt)
+                cmd.angular.z = float(self.w_filt)
+                self.pub_cmd.publish(cmd)
+                if now >= self.gap_follow_end_time:
+                    self.in_gap_follow = False
+                return
+            else:
+                # Si no hay aperturas útiles, dependiendo del modo hacer spin
+                if self.recovery_mode in ('spin', 'spin+gap'):
+                    w = min(self.w_max, 0.8 * self.w_max)
+                    v = 0.0
+                    self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
+                    self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
+                    cmd = Twist()
+                    cmd.linear.x = float(self.v_filt)
+                    cmd.angular.z = float(self.w_filt)
+                    self.pub_cmd.publish(cmd)
+                    return
+                # si recovery_mode='gap' continuar con control normal (sin return)
         self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
         self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
 
@@ -298,6 +354,82 @@ class PotentialFieldsNavigator(Node):
         self.goal_x = x
         self.goal_y = y
         self.get_logger().info(f"Nuevo objetivo: ({x:.2f}, {y:.2f})")
+    # -------------------- Gap-follow helpers --------------------
+    @staticmethod
+    def _angle_diff(a: float, b: float) -> float:
+        """Return smallest signed angle a-b in [-pi, pi]."""
+        d = (a - b + math.pi) % (2 * math.pi) - math.pi
+        return d
+
+    @staticmethod
+    def _mix_angles(a: float, b: float, wa: float) -> float:
+        """Weighted mix of two angles. wa in [0..1] weights angle a vs b."""
+        # Convert to vectors to avoid wrap issues
+        va = np.array([math.cos(a), math.sin(a)])
+        vb = np.array([math.cos(b), math.sin(b)])
+        v = wa * va + (1.0 - wa) * vb
+        if np.linalg.norm(v) < 1e-9:
+            return 0.0
+        return math.atan2(v[1], v[0])
+
+    def _select_gap_heading(self):
+        """Detect useful gaps in LIDAR and return (ok, heading_rad) for the chosen gap.
+        Heading is in robot frame (0 forward, +left)."""
+        scan = self.last_scan
+        if scan is None or len(scan.ranges) == 0 or scan.angle_increment == 0.0:
+            return False, 0.0
+        ranges = np.array(scan.ranges)
+        valid = np.isfinite(ranges) & (ranges > 0.0)
+        if not np.any(valid):
+            return False, 0.0
+        ranges = ranges.copy()
+        # Clip invalid to a small value so they count as blocked
+        ranges[~valid] = 0.0
+        n = ranges.shape[0]
+        thr = float(self.gap_clear_threshold)
+        free = ranges > thr
+        # Find contiguous free segments
+        gaps = []  # list of (i0, i1, width, center_idx)
+        i = 0
+        while i < n:
+            if free[i]:
+                start = i
+                while i < n and free[i]:
+                    i += 1
+                end = i - 1
+                width = end - start + 1
+                gaps.append((start, end, width, start + width // 2))
+            i += 1
+        if not gaps:
+            return False, 0.0
+        # Convert indices to angles and filter by min angular width
+        min_w = max(1, int(round(math.radians(self.gap_min_width_deg) / max(1e-9, scan.angle_increment))))
+        cand = []  # (score, center_angle, width)
+        # Determine desired goal heading (angle of attractive vector in robot frame)
+        if self.odom_received:
+            dx_w = self.goal_x - self.robot_x
+            dy_w = self.goal_y - self.robot_y
+            cy = math.cos(self.robot_yaw)
+            sy = math.sin(self.robot_yaw)
+            dx = dx_w * cy + dy_w * sy
+            dy = -dx_w * sy + dy_w * cy
+            goal_heading = math.atan2(dy, dx)
+        else:
+            goal_heading = 0.0
+        for (i0, i1, w, ic) in gaps:
+            if w < min_w:
+                continue
+            a_center = scan.angle_min + ic * scan.angle_increment
+            # Score: blend of width (clearance proxy) and closeness to goal heading
+            width_score = w / n
+            ang_err = abs(self._angle_diff(goal_heading, a_center))
+            ang_score = 1.0 - min(1.0, ang_err / math.pi)  # 1 best when aligned
+            score = (1.0 - self.gap_prefer_goal_weight) * width_score + self.gap_prefer_goal_weight * ang_score
+            cand.append((score, a_center, w))
+        if not cand:
+            return False, 0.0
+        cand.sort(key=lambda x: x[0], reverse=True)
+        return True, cand[0][1]
 
 def main(args=None):
     rclpy.init(args=args)
