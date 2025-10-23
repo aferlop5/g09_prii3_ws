@@ -77,6 +77,17 @@ def generate_launch_description() -> LaunchDescription:
 	# Duración (s) de seguimiento de apertura antes de re-evaluar
 	recovery_gap_duration = DeclareLaunchArgument('recovery_gap_duration', default_value='3.0')
 
+	# --- Fallback adicional: seguimiento de paredes (Wall-Follow) ---
+	use_wall_follow = DeclareLaunchArgument('use_wall_follow', default_value='true')
+	wall_side = DeclareLaunchArgument('wall_side', default_value='auto')  # auto|left|right
+	wall_distance = DeclareLaunchArgument('wall_distance', default_value='0.38')
+	wall_kp = DeclareLaunchArgument('wall_kp', default_value='1.2')
+	wall_lin_vel = DeclareLaunchArgument('wall_lin_vel', default_value='0.28')
+	wall_timeout = DeclareLaunchArgument('wall_timeout', default_value='6.0')
+	wall_front_switch_thresh = DeclareLaunchArgument('wall_front_switch_thresh', default_value='0.45')
+	wall_switch_margin = DeclareLaunchArgument('wall_switch_margin', default_value='0.07')
+	wall_switch_cooldown = DeclareLaunchArgument('wall_switch_cooldown', default_value='1.5')
+
 	pf_node = Node(
 		package='g09_prii3',
 		executable='jetbot_potential_fields',
@@ -106,6 +117,15 @@ def generate_launch_description() -> LaunchDescription:
 				'gap_prefer_goal_weight': ParameterValue(LaunchConfiguration('gap_prefer_goal_weight'), value_type=float),
 				'recovery_mode': LaunchConfiguration('recovery_mode'),
 				'recovery_gap_duration': ParameterValue(LaunchConfiguration('recovery_gap_duration'), value_type=float),
+				'use_wall_follow': ParameterValue(LaunchConfiguration('use_wall_follow'), value_type=bool),
+				'wall_side': LaunchConfiguration('wall_side'),
+				'wall_distance': ParameterValue(LaunchConfiguration('wall_distance'), value_type=float),
+				'wall_kp': ParameterValue(LaunchConfiguration('wall_kp'), value_type=float),
+				'wall_lin_vel': ParameterValue(LaunchConfiguration('wall_lin_vel'), value_type=float),
+				'wall_timeout': ParameterValue(LaunchConfiguration('wall_timeout'), value_type=float),
+				'wall_front_switch_thresh': ParameterValue(LaunchConfiguration('wall_front_switch_thresh'), value_type=float),
+				'wall_switch_margin': ParameterValue(LaunchConfiguration('wall_switch_margin'), value_type=float),
+				'wall_switch_cooldown': ParameterValue(LaunchConfiguration('wall_switch_cooldown'), value_type=float),
 		}],
 		# Remappings (uncomment if your topics differ)
 		# remappings=[
@@ -138,6 +158,15 @@ def generate_launch_description() -> LaunchDescription:
 		gap_prefer_goal_weight,
 		recovery_mode,
 		recovery_gap_duration,
+		use_wall_follow,
+		wall_side,
+		wall_distance,
+		wall_kp,
+		wall_lin_vel,
+		wall_timeout,
+		wall_front_switch_thresh,
+		wall_switch_margin,
+		wall_switch_cooldown,
 		pf_node,
 	])
 

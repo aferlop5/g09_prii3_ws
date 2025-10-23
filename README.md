@@ -25,7 +25,9 @@ g09_prii3_ws/
 │  ├─ sprint1.launch.py
 │  ├─ jetbot_drawer.launch.py
 │  ├─ obstacle_avoidance_simple.launch.py
-│  └─ obstacle_avoidance_advanced.launch.py
+│  ├─ obstacle_avoidance_advanced.launch.py
+│  ├─ Potential_Fields.launch.py
+│  └─ Potential_Fields_door_fast.launch.py
 ├─ resource/
 │  └─ g09_prii3
 ├─ src/
@@ -54,6 +56,7 @@ Archivos clave (abre con un clic)
 - [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)  
 - [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)  
 - [launch/Potential_Fields.launch.py](launch/Potential_Fields.launch.py)  
+- [launch/Potential_Fields_door_fast.launch.py](launch/Potential_Fields_door_fast.launch.py)  
 - [src/g09_prii3/__init__.py](src/g09_prii3/__init__.py)  
 - [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py) — clase principal: [`TurtleNine`](src/g09_prii3/prii3_turtlesim_node.py)  
 - [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase principal: [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)  
@@ -246,11 +249,19 @@ Descripción
 - Navegación reactiva hacia una meta global `(goal_x, goal_y)` usando Campos Potenciales: atracción hacia la meta + repulsión por LIDAR.
 - Integra odometría (`/odom`) para calcular el vector atractivo real (posición del robot en mundo → vector en el frame del robot).
 - Estabilidad: suavizado low‑pass de comandos, reducción de velocidad cerca de obstáculos y ante grandes errores angulares.
-- Robustez: detección de estancamiento y recuperación (giro breve hacia el lado con más espacio), muestreo por sectores y percentiles en la repulsión para evitar ruido.
+- Robustez: detección de estancamiento y recuperación con estrategia combinada "spin+gap" puerta‑friendly por defecto:
+  - Follow‑The‑Gap: cuando no hay progreso, detecta la mayor apertura (p. ej., una puerta) y avanza hacia su centro.
+  - Si no hay hueco claro, alterna con un giro en el sitio para salir del mínimo local.
+  - Al pulsar Ctrl+C, publica un `Twist(0,0)` para detener motores antes de apagar.
 
 Lanzar (meta en metros en `odom`)
 ```bash
 ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.80 goal_y:=-0.03
+```
+
+Perfil rápido puerta‑friendly (recomendado para puertas/pasillos)
+```bash
+ros2 launch g09_prii3 Potential_Fields_door_fast.launch.py goal_x:=1.80 goal_y:=-0.03
 ```
 
 Parámetros principales
@@ -258,16 +269,24 @@ Parámetros principales
 - `goal_tolerance` (float, default 0.10): radio de llegada en metros.
 - `odom_topic` (string, default `/odom`): tópico de odometría.
 - `k_att` (float, default 1.0): ganancia atractiva.
-- `k_rep` (float, default 0.30): ganancia repulsiva.
-- `d0_rep` (float, default 0.53): radio de influencia repulsiva.
+- `k_rep` (float, default 0.32): ganancia repulsiva.
+- `d0_rep` (float, default 0.55): radio de influencia repulsiva.
 - `max_lin_vel` (float, default 0.30), `max_ang_vel` (float, default 1.0): límites de velocidad.
 - `ang_gain` (float, default 1.5), `lin_gain` (float, default 1.0): ganancias del controlador.
-- `slowdown_min_scale` (float, default 0.18): factor mínimo de velocidad cerca de obstáculos.
-- `front_weight_deg` (float, default 85.0): ancho del sector frontal priorizado en repulsión.
-- `rep_scale_side` (float, default 0.45): peso relativo de repulsión en laterales.
-- `smooth_alpha` (float, default 0.30): coeficiente de suavizado de `v`/`w` (0..1).
+- `slowdown_min_scale` (float, default 0.20): factor mínimo de velocidad cerca de obstáculos.
+- `front_weight_deg` (float, default 80.0): ancho del sector frontal priorizado en repulsión.
+- `rep_scale_side` (float, default 0.42): peso relativo de repulsión en laterales.
+- `smooth_alpha` (float, default 0.40): coeficiente de suavizado de `v`/`w` (0..1).
 - `stuck_timeout` (float, default 3.0): tiempo sin progreso para activar recuperación.
 - `escape_gain` (float, default 0.20): pequeña perturbación aleatoria para escapar de mínimos locales.
+
+Parámetros de recuperación puerta‑friendly
+- `use_gap_follow` (bool, default `true`): activa el seguimiento de aperturas cuando no hay progreso.
+- `recovery_mode` (string, default `spin+gap`): `gap` | `spin` | `spin+gap`.
+- `gap_clear_threshold` (float, default = `d0_rep`): distancia considerada libre para formar una apertura.
+- `gap_min_width_deg` (float, default 12.0): anchura mínima de la apertura válida (grados).
+- `gap_prefer_goal_weight` (float, default 0.6): peso [0..1] para sesgar la apertura hacia la dirección de la meta.
+- `recovery_gap_duration` (float, default 3.0): tiempo de seguimiento de la apertura antes de re‑evaluar.
 
 Tópicos
 - Sub: `/scan` (sensor_msgs/LaserScan), `/odom` (nav_msgs/Odometry)
@@ -275,9 +294,10 @@ Tópicos
 
 Consejos de afinado
 - Más distancia frontal: sube `d0_rep` (+0.02..0.05) y/o `k_rep` (+0.02..0.05).
-- Más holgura lateral al girar: sube `rep_scale_side` (0.45→0.55) y/o `front_weight_deg` (85→90).
-- Menos oscilación: baja `ang_gain` o sube `smooth_alpha` (p.ej. 0.35).
+- Más holgura lateral al girar: sube `rep_scale_side` (0.42→0.50) y/o `front_weight_deg` (80→90).
+- Menos oscilación: baja `ang_gain` o sube `smooth_alpha` (p.ej. 0.45).
 - Más decisión hacia meta (en despeje): sube `lin_gain` o baja `slowdown_min_scale` con cuidado.
+- Si duda en puertas: baja `gap_min_width_deg` (p.ej. 10) o `gap_prefer_goal_weight` (0.5).
 
 Archivo de launch: [launch/Potential_Fields.launch.py](launch/Potential_Fields.launch.py)
 

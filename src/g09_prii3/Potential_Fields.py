@@ -49,6 +49,17 @@ class PotentialFieldsNavigator(Node):
         self.declare_parameter('gap_prefer_goal_weight', 0.6)  # [0..1] 1=todo objetivo, 0=solo apertura más grande
         self.declare_parameter('recovery_mode', 'spin+gap')  # 'spin' | 'gap' | 'spin+gap'
         self.declare_parameter('recovery_gap_duration', 3.0)
+        # Seguimiento de paredes (wall-follow) como fallback adicional
+        self.declare_parameter('use_wall_follow', True)
+        self.declare_parameter('wall_side', 'auto')  # 'auto' | 'left' | 'right'
+        self.declare_parameter('wall_distance', 0.38)
+        self.declare_parameter('wall_kp', 1.2)
+        self.declare_parameter('wall_lin_vel', 0.28)
+        self.declare_parameter('wall_timeout', 6.0)
+    # Cambio de pared en esquinas
+        self.declare_parameter('wall_front_switch_thresh', 0.45)
+        self.declare_parameter('wall_switch_margin', 0.07)
+    self.declare_parameter('wall_switch_cooldown', 1.5)
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -76,6 +87,17 @@ class PotentialFieldsNavigator(Node):
         self.gap_prefer_goal_weight = float(self.get_parameter('gap_prefer_goal_weight').value)
         self.recovery_mode = str(self.get_parameter('recovery_mode').value or 'gap').lower()
         self.recovery_gap_duration = float(self.get_parameter('recovery_gap_duration').value)
+        self.use_wall_follow = bool(self.get_parameter('use_wall_follow').value)
+        self.wall_side = str(self.get_parameter('wall_side').value or 'auto').lower()
+        if self.wall_side not in ('auto','left','right'):
+            self.wall_side = 'auto'
+        self.wall_distance = float(self.get_parameter('wall_distance').value)
+        self.wall_kp = float(self.get_parameter('wall_kp').value)
+        self.wall_lin_vel = float(self.get_parameter('wall_lin_vel').value)
+        self.wall_timeout = float(self.get_parameter('wall_timeout').value)
+        self.wall_front_switch_thresh = float(self.get_parameter('wall_front_switch_thresh').value)
+    self.wall_switch_margin = float(self.get_parameter('wall_switch_margin').value)
+    self.wall_switch_cooldown = float(self.get_parameter('wall_switch_cooldown').value)
 
         self.sub_scan = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
         self.sub_odom = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
@@ -96,6 +118,10 @@ class PotentialFieldsNavigator(Node):
         self.last_progress_time = self.get_clock().now().nanoseconds * 1e-9
         self.in_gap_follow = False
         self.gap_follow_end_time = 0.0
+        self.in_wall_follow = False
+        self.wall_follow_end_time = 0.0
+    self.wall_follow_side = 'left'
+    self.last_wall_switch_time = 0.0
 
         self.create_timer(0.05, self.control_loop)
 
@@ -330,7 +356,25 @@ class PotentialFieldsNavigator(Node):
                     self.in_gap_follow = False
                 return
             else:
-                # Si no hay aperturas útiles, dependiendo del modo hacer spin
+                # Si no hay aperturas útiles, intentar wall-follow si está activado
+                if self.use_wall_follow:
+                    if not self.in_wall_follow:
+                        self.in_wall_follow = True
+                        self.wall_follow_end_time = now + max(2.0, self.wall_timeout)
+                        # Elegir lado: auto = según signo del heading a la meta (positivo → izquierda)
+                        self.wall_follow_side = self._choose_wall_side()
+                    v, w = self._wall_follow_control()
+                    # suavizado
+                    self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
+                    self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
+                    cmd = Twist()
+                    cmd.linear.x = float(self.v_filt)
+                    cmd.angular.z = float(self.w_filt)
+                    self.pub_cmd.publish(cmd)
+                    if now >= self.wall_follow_end_time:
+                        self.in_wall_follow = False
+                    return
+                # Si wall-follow no está activo, dependiendo del modo hacer spin
                 if self.recovery_mode in ('spin', 'spin+gap'):
                     w = min(self.w_max, 0.8 * self.w_max)
                     v = 0.0
@@ -430,6 +474,109 @@ class PotentialFieldsNavigator(Node):
             return False, 0.0
         cand.sort(key=lambda x: x[0], reverse=True)
         return True, cand[0][1]
+
+    # -------------------- Wall-follow helpers --------------------
+    def _choose_wall_side(self) -> str:
+        # Si hay odometría y un heading claro a la meta, usa su signo
+        if self.odom_received:
+            dx_w = self.goal_x - self.robot_x
+            dy_w = self.goal_y - self.robot_y
+            cy = math.cos(self.robot_yaw)
+            sy = math.sin(self.robot_yaw)
+            dx = dx_w * cy + dy_w * sy
+            dy = -dx_w * sy + dy_w * cy
+            goal_heading = math.atan2(dy, dx)
+            if self.wall_side == 'auto':
+                return 'left' if goal_heading >= 0.0 else 'right'
+        if self.wall_side in ('left','right'):
+            return self.wall_side
+        return 'left'
+
+    def _sector_values_by_deg(self, min_deg: float, max_deg: float):
+        scan = self.last_scan
+        if scan is None:
+            return []
+        n = len(scan.ranges)
+        if n == 0 or scan.angle_increment == 0.0:
+            return []
+        a_min = scan.angle_min
+        a_inc = scan.angle_increment
+        lo = math.radians(min_deg)
+        hi = math.radians(max_deg)
+        def ang_to_idx(a: float) -> int:
+            i = int(round((a - a_min) / a_inc))
+            return max(0, min(n - 1, i))
+        i0 = ang_to_idx(lo)
+        i1 = ang_to_idx(hi)
+        if i0 > i1:
+            i0, i1 = i1, i0
+        vals = [r for r in list(self.last_scan.ranges)[i0:i1+1] if r is not None and math.isfinite(r) and r > 0.0]
+        return vals
+
+    @staticmethod
+    def _percentile_list(vals, p: float):
+        if not vals:
+            return None
+        s = sorted(vals)
+        k = max(0, min(len(s) - 1, int(round((p / 100.0) * (len(s) - 1)))))
+        return s[k]
+
+    def _side_distances(self):
+        # Sectores laterales ~60-120 grados
+        left_vals = self._sector_values_by_deg(60.0, 120.0)
+        right_vals = self._sector_values_by_deg(-120.0, -60.0)
+        left = self._percentile_list(left_vals, 30.0) if left_vals else None
+        right = self._percentile_list(right_vals, 30.0) if right_vals else None
+        return left, right
+
+    def _front_min(self):
+        vals = self._sector_values_by_deg(-20.0, 20.0)
+        if not vals:
+            return None
+        return min(vals) if vals else None
+
+    def _wall_follow_control(self):
+        # Control proporcional sencillo para mantener distancia a la pared seleccionada
+        left, right = self._side_distances()
+        side = self.wall_follow_side
+        desired = self.wall_distance
+        v = self.wall_lin_vel
+        w = 0.0
+        front = self._front_min()
+        now = self.get_clock().now().nanoseconds * 1e-9
+        # Detección de esquina y cambio de pared si procede
+        corner_thresh = max(0.3, min(self.wall_front_switch_thresh, max(0.3, self.d0)))
+        if self.use_wall_follow and front is not None and front < corner_thresh:
+            preferred = side
+            if left is not None and right is not None:
+                if left + self.wall_switch_margin < right:
+                    preferred = 'left'
+                elif right + self.wall_switch_margin < left:
+                    preferred = 'right'
+            elif left is not None:
+                preferred = 'left'
+            elif right is not None:
+                preferred = 'right'
+            if preferred != side and (now - self.last_wall_switch_time) > self.wall_switch_cooldown:
+                self.wall_follow_side = preferred
+                self.last_wall_switch_time = now
+                self.get_logger().info(f"Esquina detectada — cambiando a pared {preferred}.")
+                side = preferred
+        # Evitar colisión frontal
+        if front is not None and front < max(0.3, 0.7 * self.d0):
+            v *= 0.3
+            w += 0.8 * self.w_max * (-1.0 if side == 'right' else 1.0)
+        # Control lateral
+        if side == 'left' and left is not None:
+            e = desired - left  # positivo → demasiado lejos de la pared → girar a la izquierda
+            w += self.wall_kp * e
+        elif side == 'right' and right is not None:
+            e = desired - right  # positivo → lejos de la pared → girar a la derecha (w negativo)
+            w -= self.wall_kp * e
+        # Limitar
+        w = max(-self.w_max, min(self.w_max, w))
+        v = min(self.v_max, max(0.0, v))
+        return v, w
 
 def main(args=None):
     rclpy.init(args=args)
