@@ -338,6 +338,64 @@ Recursos y enlaces rápidos
 
 ---
 
+Ejercicio de ML ligero — TurtleBot3 + Gazebo
+---
+Nodo: `ml_test`  
+Archivo: [src/g09_prii3/ml_test.py](src/g09_prii3/ml_test.py)
+
+¿Qué hace?
+- Entrena/ejecuta un agente de Aprendizaje por Refuerzo ligero (PPO/SAC, stable-baselines3) para navegar hacia una meta fija con TurtleBot3 en Gazebo.
+- Observación = LIDAR downsampleado + vector objetivo relativo (dx, dy) en el marco del robot.
+- Acción = [velocidad lineal, velocidad angular] publicadas en `/cmd_vel`.
+- Recompensas:
+  - +10 si llega al objetivo (el robot se detiene al llegar)
+  - -1 si colisiona (LIDAR por debajo del umbral)
+  - -0.05 si se queda quieto
+  - +1 cuando se acerca a la meta respecto al paso anterior
+- Reinicio automático: si no llega en 20 s, termina el episodio y reinicia.
+- Persistencia: guarda el modelo por meta (coordenadas) en `~/.g09_prii3/models/` para recordar rutas en ejecuciones futuras.
+
+Requisitos Python (instalar una vez)
+- Para ROS 2 Foxy (Python 3.8): usa versiones compatibles y ligeras
+```bash
+# PyTorch CPU y dependencias compatibles con Python 3.8
+pip install --user "torch==1.13.1+cpu" --extra-index-url https://download.pytorch.org/whl/cpu
+
+# Estable y compatible con Gym clásico
+pip install --user "stable-baselines3==1.8.0" "gym==0.21.0" cloudpickle==2.2.1
+
+# Opcional (métricas y utilidades)
+pip install --user tensorboard==2.14.0 tqdm rich
+```
+Nota: Si previamente instalaste versiones más nuevas y hay conflictos, puedes limpiar con `pip uninstall` de los paquetes problemáticos (por ejemplo `gymnasium`, `stable-baselines3` sin versión, etc.).
+
+Lanzar todo (Gazebo + agente ML)
+```bash
+# 1) Compila y sourcea este workspace si no lo has hecho
+colcon build --symlink-install
+source install/setup.bash
+
+# 2) Lanza el mundo de TurtleBot3 y el nodo de RL
+ros2 launch g09_prii3 ml_test.launch.py goal_x:=1.0 goal_y:=0.0 total_timesteps:=10000 algorithm:=PPO
+```
+
+Notas
+- El launch exporta automáticamente `TURTLEBOT3_MODEL=burger` y abre `turtlebot3_world.launch.py`.
+- Puedes cambiar la meta con `goal_x`, `goal_y` (en metros, frame `odom`).
+- El primer entrenamiento puede tardar; el modelo se guarda en `~/.g09_prii3/models/ppo_tb3_goal_<x>_<y>.zip` y se recarga si lanzas de nuevo con la misma meta.
+- Si no tienes `turtlebot3_gazebo` instalado, instálalo según tu distro ROS 2 (p. ej. `sudo apt install ros-foxy-turtlebot3-gazebo`).
+
+Ejecutar solo el nodo (si ya tienes Gazebo y TB3 corriendo)
+```bash
+ros2 run g09_prii3 ml_test --ros-args -p goal_x:=1.0 -p goal_y:=0.0 -p total_timesteps:=5000 -p algorithm:=PPO
+```
+
+Solución de problemas
+- Error de importación SB3/torch/gymnasium: instala los requisitos Python indicados arriba.
+- No arranca Gazebo: comprueba que el paquete `turtlebot3_gazebo` está instalado y que tu shell está sourceada (`source /opt/ros/<distro>/setup.bash`).
+- El robot no se mueve: verifica que Gazebo está corriendo, que `/scan` y `/odom` publican, y que no hay colisiones inmediatas.
+
+
 <center>
 **Autor:** Agustí Ferrandiz
 
