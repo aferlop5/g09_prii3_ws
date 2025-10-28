@@ -81,20 +81,35 @@ class JetbotDrawer(Node):
 
         
 
-    # Small pause to stabilize
+        # Pausa corta para estabilizar el robot antes de empezar a dibujar el "9"
         segments.append({"vx": 0.0, "wz": 0.0, "duration": 0.5, "label": "pause_between"})
 
-        # Draw '9' similar to turtlesim example
-        segments.extend([
-            {"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_up"},
-            {"vx": v, "wz": 0.0, "duration": 0.8 / v, "label": "short_left_up"},
-            {"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_top"},
-            {"vx": v, "wz": 0.0, "duration": 0.5 / v, "label": "top_right"},
-            {"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_right"},
-            {"vx": v, "wz": 0.0, "duration": 0.5 / v, "label": "right_down"},
-            {"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_close"},
-            {"vx": v, "wz": 0.0, "duration": 0.7 / v, "label": "close_left"},
-        ])
+        # DIBUJO DEL "9" — cada segmento corresponde a un trazo o giro concreto
+
+        # 1) Giro de 90° (antihorario) para encarar el primer tramo del "9" (orientación inicial -> arriba)
+        #segments.append({"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_up"})
+
+        # 2) Tramo recto corto: ascenso por el lateral izquierdo del "9"
+        #    Avanza hacia adelante para comenzar la "columna" izquierda del número.
+        segments.append({"vx": v, "wz": 0.0, "duration": 1.5 / v, "label": "short_left_up"})
+
+        # 3) Giro de 90° (antihorario) para encarar el tramo superior (la "panza" de la parte de arriba)
+        segments.append({"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_top"})
+
+        # 4) Tramo superior: línea recta que forma la parte alta del "9"
+        segments.append({"vx": v, "wz": 0.0, "duration": 0.5 / v, "label": "top_right"})
+
+        # 5) Giro de 90° (antihorario) para encarar el lateral derecho
+        segments.append({"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_right"})
+
+        # 6) Lateral derecho descendente del "9": baja en línea recta
+        segments.append({"vx": v, "wz": 0.0, "duration": 0.5 / v, "label": "right_down"})
+
+        # 7) Giro de 90° (antihorario) para orientar el tramo de cierre de la "panza"
+        segments.append({"vx": 0.0, "wz": w, "duration": math.pi / 2.0 / w, "label": "turn_close"})
+
+        # 8) Tramo de cierre hacia la izquierda: completa el bucle de la parte superior del "9"
+        segments.append({"vx": v, "wz": 0.0, "duration": 0.7 / v, "label": "close_left"})
 
         return segments
 
