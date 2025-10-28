@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Deque
 import math
 import time
+from collections import deque
 
 import rclpy
 from rclpy.node import Node
@@ -26,14 +27,14 @@ class JetbotAvoider(Node):
         # Parameters
         self.declare_parameter('linear_speed', 0.15)
         self.declare_parameter('angular_speed', 0.6)
-        self.declare_parameter('obstacle_threshold', 0.3)
+    self.declare_parameter('obstacle_threshold', 0.35)
         self.declare_parameter('avoidance_mode', 'simple')  # 'simple' | 'advanced'
         # Advanced-only sensitivity: detect earlier than threshold (multiplier > 1)
-        self.declare_parameter('advanced_detect_factor', 1.3)
+    self.declare_parameter('advanced_detect_factor', 1.8)
         # Advanced-only: prefer rotate-in-place when close (>=1.0 rotates even before threshold)
-        self.declare_parameter('advanced_rotate_factor', 1.05)
+    self.declare_parameter('advanced_rotate_factor', 1.2)
         # Advanced-only: front cone aperture in degrees (total span)
-        self.declare_parameter('advanced_front_cone_deg', 60.0)
+    self.declare_parameter('advanced_front_cone_deg', 90.0)
 
         # Resolve params
         self._v = float(self.get_parameter('linear_speed').get_parameter_value().double_value)
@@ -83,6 +84,20 @@ class JetbotAvoider(Node):
         self._last_turn_dir: int = +1  # +1 left, -1 right (advanced)
         self._avoid_start_sec: Optional[float] = None
 
+    # Advanced-mode smoothing: keep short history of front distance
+    self._front_hist: Deque[float] = deque(maxlen=3)
+
+    # LIDAR indexing cache (computed on first scan or when scan meta changes)
+    self._idx_ready: bool = False
+    self._idx_n: int = 0
+    self._idx_zero: int = 0
+    self._deg_per_index: float = 1.0  # degrees per index
+    self._angle_span_deg: float = 0.0
+    # Cached sector index ranges (inclusive tuples)
+    self._idx_front: Tuple[int, int] = (0, 0)
+    self._idx_left: Tuple[int, int] = (0, 0)
+    self._idx_right: Tuple[int, int] = (0, 0)
+
         # Advanced-mode tuning (does not affect simple mode)
         self._resume_factor = 1.25  # need a bit more clearance before resuming forward
         self._front_cone_deg = front_cone_param  # degrees around the front to assess obstacle
@@ -102,6 +117,8 @@ class JetbotAvoider(Node):
     # ------------------------- Callbacks -------------------------------------
     def _on_scan(self, msg: LaserScan) -> None:
         self._last_scan = msg
+        # Prepare/correct indexer if needed
+        self._ensure_indexer(msg)
 
     # ------------------------- Helpers ---------------------------------------
     @staticmethod
@@ -127,31 +144,72 @@ class JetbotAvoider(Node):
     def _now_sec(self) -> float:
         return float(self.get_clock().now().nanoseconds) / 1e9
 
+    def _ensure_indexer(self, scan: LaserScan) -> None:
+        """Compute and cache LIDAR index mapping and common sector index ranges.
+        We define 0 deg as the real front of the robot = middle index of ranges.
+        """
+        n = len(scan.ranges)
+        if n <= 0:
+            self._idx_ready = False
+            return
+        # Compute only if first time or scan meta changed
+        angle_span = float(scan.angle_max - scan.angle_min)
+        angle_span_deg = angle_span * 180.0 / math.pi
+        if (
+            not self._idx_ready
+            or self._idx_n != n
+            or abs(angle_span_deg - self._angle_span_deg) > 1e-6
+        ):
+            self._idx_n = n
+            self._idx_zero = n // 2
+            # Degrees per index from total FoV; independent of angle_min origin
+            self._angle_span_deg = angle_span_deg
+            self._deg_per_index = (angle_span_deg / max(1, n))
+
+            # Helper to convert degrees around front to index (clamped)
+            def deg_to_idx(deg: float) -> int:
+                i = int(self._idx_zero + (deg / self._deg_per_index))
+                return max(0, min(self._idx_n - 1, i))
+
+            # Precompute sector index ranges based on configured degrees
+            half_front = 0.5 * self._front_cone_deg
+            f0, f1 = deg_to_idx(-half_front), deg_to_idx(+half_front)
+            if f0 > f1:
+                f0, f1 = f1, f0
+            self._idx_front = (f0, f1)
+
+            # Side sectors: Left +inner..+outer, Right -outer..-inner
+            li, lo = deg_to_idx(self._side_inner_deg), deg_to_idx(self._side_outer_deg)
+            if li > lo:
+                li, lo = lo, li
+            self._idx_left = (li, lo)
+
+            ro, ri = deg_to_idx(-self._side_outer_deg), deg_to_idx(-self._side_inner_deg)
+            if ro > ri:
+                ro, ri = ri, ro
+            self._idx_right = (ro, ri)
+
+            self._idx_ready = True
+
     def _sector_values_by_deg(self, min_deg: float, max_deg: float) -> List[float]:
-        """Return finite scan values within [min_deg, max_deg] sector (degrees around 0=front)."""
+        """Return finite scan values within [min_deg, max_deg] using zero at middle index.
+        Uses cached deg-to-index mapping for efficiency.
+        """
         if self._last_scan is None:
             return []
         scan = self._last_scan
         n = len(scan.ranges)
-        if n == 0 or scan.angle_increment == 0.0:
+        if not self._idx_ready or n == 0:
             return []
-        # Convert to radians
-        a_min = scan.angle_min
-        a_inc = scan.angle_increment
-        # Target angles in radians around 0 (front)
-        lo = math.radians(min_deg)
-        hi = math.radians(max_deg)
-        # Compute indices corresponding to [lo, hi]
-        # Index i corresponds to angle a_min + i*a_inc
-        def ang_to_idx(a: float) -> int:
-            i = int(round((a - a_min) / a_inc))
-            return max(0, min(n - 1, i))
 
-        i0 = ang_to_idx(lo)
-        i1 = ang_to_idx(hi)
+        def deg_to_idx(deg: float) -> int:
+            i = int(self._idx_zero + (deg / self._deg_per_index))
+            return max(0, min(self._idx_n - 1, i))
+
+        i0, i1 = deg_to_idx(min_deg), deg_to_idx(max_deg)
         if i0 > i1:
             i0, i1 = i1, i0
-        sector = list(scan.ranges[i0:i1 + 1])
+        sector = list(scan.ranges[i0 : i1 + 1])
         return self._finite_values(sector)
 
     @staticmethod
@@ -163,13 +221,13 @@ class JetbotAvoider(Node):
         return vals_sorted[k]
 
     def _front_distance_adv(self) -> Optional[float]:
-        """More robust front distance: 10th percentile in +/- front_cone/2."""
+        """More robust front distance: 20th percentile in +/- front_cone/2."""
         half = 0.5 * self._front_cone_deg
         vals = self._sector_values_by_deg(-half, +half)
         # If angle info is missing or empty, fall back
         if not vals:
             return self._front_distance()
-        return self._percentile(vals, 10.0)
+        return self._percentile(vals, 20.0)
 
     def _side_clearance_adv(self) -> Tuple[Optional[float], Optional[float]]:
         """Return representative clearances for left/right using side sectors.
@@ -251,51 +309,72 @@ class JetbotAvoider(Node):
         if self._mode == 'advanced':
             # Detect earlier in advanced mode using robust front and a multiplier
             d_front_adv = self._front_distance_adv()
-            d_check = d_front_adv if d_front_adv is not None else d_front_simple
-            if d_check is not None and d_check < (self._threshold * self._adv_detect_factor):
-                # Robust front and side assessments
-                left_clear, right_clear = self._side_clearance_adv()
+            # Update smoothing history
+            if d_front_adv is not None:
+                self._front_hist.append(d_front_adv)
+            # Compute smoothed front distance
+            if self._front_hist:
+                d_front_smooth = sum(self._front_hist) / len(self._front_hist)
+            else:
+                d_front_smooth = d_front_adv if d_front_adv is not None else d_front_simple
 
-                # If no side info, rotate in place to search
+            # Side clearances for decision and logging
+            left_clear, right_clear = self._side_clearance_adv()
+
+            # Compact debug log
+            def fmt(x: Optional[float]) -> str:
+                return f"{x:.2f}" if x is not None else "nan"
+
+            self.get_logger().info(
+                f"[ADV] front={fmt(d_front_smooth)} L={fmt(left_clear)} R={fmt(right_clear)} state={self._state}"
+            )
+
+            d_check = d_front_smooth if d_front_smooth is not None else d_front_simple
+            if d_check is not None and d_check < (self._threshold * self._adv_detect_factor):
+                # Determine desired turn direction based on clearances
                 if left_clear is None and right_clear is None:
-                    self._set_state('avoid_left', 'escaneo insuficiente')
-                    self._last_turn_dir = +1
+                    # No side info: rotate to search using last direction
+                    turn_dir = self._last_turn_dir
+                    self._set_state('avoid_left' if turn_dir > 0 else 'avoid_right', 'escaneo insuficiente')
                     self._avoid_start_sec = self._avoid_start_sec or self._now_sec()
-                    self._publish(0.0, +self._w * self._search_w_factor)
+                    self._publish(0.0, self._w * self._search_w_factor * turn_dir)
                     return
 
-                # Choose the side with greater clearance
                 if right_clear is None or (left_clear is not None and left_clear > right_clear):
-                    turn_dir = +1  # left
-                    reason = (
-                        f'clearance L={left_clear:.2f} '
-                        f'R={right_clear if right_clear is not None else float("nan"):.2f}'
-                    )
-                    self._set_state('avoid_left', reason)
+                    desired_dir = +1
                 else:
-                    turn_dir = -1  # right
-                    reason = (
-                        f'clearance L={left_clear if left_clear is not None else float("nan"):.2f} '
-                        f'R={right_clear:.2f}'
-                    )
-                    self._set_state('avoid_right', reason)
+                    desired_dir = -1
+
+                now = self._now_sec()
+                # Direction persistence: do not flip within first 0.5s of avoidance
+                if self._state in ('avoid_left', 'avoid_right') and self._avoid_start_sec is not None:
+                    if (now - self._avoid_start_sec) < 0.5:
+                        turn_dir = self._last_turn_dir
+                    else:
+                        turn_dir = desired_dir
+                else:
+                    turn_dir = desired_dir
+
+                # Update state text based on direction
+                if turn_dir > 0:
+                    self._set_state('avoid_left', None)
+                else:
+                    self._set_state('avoid_right', None)
 
                 # Prefer rotate-in-place when close (tight spaces)
-                now = self._now_sec()
                 if d_check < (self._threshold * self._rotate_factor):
-                    self._avoid_start_sec = self._avoid_start_sec or now
+                    if self._avoid_start_sec is None:
+                        self._avoid_start_sec = now
                     self._publish(0.0, self._w * turn_dir)
                     self._last_turn_dir = turn_dir
                     return
 
-                # Stuck detection: if we've been avoiding for too long with very close front, rotate in place
+                # Stuck detection using smoothed front distance
                 if self._avoid_start_sec is None:
                     self._avoid_start_sec = now
-                blocked_front = d_front_adv if d_front_adv is not None else d_front_simple
-                blocked = (blocked_front is not None) and (blocked_front < (0.8 * self._threshold))
-                if blocked and (now - self._avoid_start_sec) > self._stuck_timeout:
-                    # Try rotate-in-place to break free; alternate direction next time
-                    self._publish(0.0, self._w * turn_dir)
+                if d_check < (0.8 * self._threshold) and (now - self._avoid_start_sec) > self._stuck_timeout:
+                    # Strong rotate-in-place to break free
+                    self._publish(0.0, self._w * 1.5 * turn_dir)
                     self._last_turn_dir = turn_dir
                     # Reset timer after a rotate-in-place attempt
                     self._avoid_start_sec = now
@@ -316,14 +395,18 @@ class JetbotAvoider(Node):
         if self._mode == 'advanced':
             # If we were avoiding, require a bit of extra clearance to resume
             d_front_adv = self._front_distance_adv()
-            if self._state in ('avoid_left', 'avoid_right') and d_front_adv is not None:
-                if d_front_adv < self._threshold * self._resume_factor:
+            if d_front_adv is not None:
+                # update smoothing too so resume uses recent history
+                self._front_hist.append(d_front_adv)
+            d_front_smooth = sum(self._front_hist) / len(self._front_hist) if self._front_hist else d_front_adv
+            if self._state in ('avoid_left', 'avoid_right') and d_front_smooth is not None:
+                if d_front_smooth < self._threshold * self._resume_factor:
                     # Keep avoiding in same direction gently
                     turn_dir = +1 if self._state == 'avoid_left' else -1
                     self._publish(self._v * self._creep_factor, self._w * turn_dir)
                     return
                 # Clear enough — drop back to forward
-            # Reset avoid timer when resuming forward
+            # Reset avoid timer when resuming forward; keep last turn dir
             self._avoid_start_sec = None
 
         if self._state != 'forward':
