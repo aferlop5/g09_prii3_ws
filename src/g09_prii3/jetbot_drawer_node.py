@@ -79,11 +79,9 @@ class JetbotDrawer(Node):
 
         segments: List[Dict[str, float]] = []
 
-        # Draw '0' as a circle: one full rotation while moving forward
-        circle_time = 2.0 * math.pi / abs(w)
-        segments.append({"vx": v, "wz": w, "duration": circle_time, "label": "zero_circle"})
+        
 
-        # Small pause to stabilize
+    # Small pause to stabilize
         segments.append({"vx": 0.0, "wz": 0.0, "duration": 0.5, "label": "pause_between"})
 
         # Draw '9' similar to turtlesim example
