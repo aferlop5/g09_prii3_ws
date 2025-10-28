@@ -161,15 +161,32 @@ class JetbotAvoider(Node):
             or abs(angle_span_deg - self._angle_span_deg) > 1e-6
         ):
             self._idx_n = n
-            self._idx_zero = n // 2
+            # FIX: Choose front index depending on scan angular range
+            min_rad = float(scan.angle_min)
+            max_rad = float(scan.angle_max)
+            # If angles cover roughly [-pi, +pi], front is in the middle
+            if (min_rad <= -math.pi + 0.2) and (max_rad >= math.pi - 0.2):  # FIX:
+                self._idx_zero = n // 2  # FIX:
+            # If angles cover roughly [0, 2*pi], front is at index 0
+            elif (min_rad >= -1e-3) and (max_rad <= 2.0 * math.pi + 0.2):  # FIX:
+                self._idx_zero = 0  # FIX:
+            else:
+                # Fallback to center
+                self._idx_zero = n // 2  # FIX:
             # Degrees per index from total FoV; independent of angle_min origin
             self._angle_span_deg = angle_span_deg
             self._deg_per_index = (angle_span_deg / max(1, n))
+            # DEBUG: Log angular metadata and chosen zero index
+            self.get_logger().info(
+                f"[DEBUG] angle_min={min_rad:.3f}rad angle_max={max_rad:.3f}rad idx_zero={self._idx_zero} fov_deg={self._angle_span_deg:.1f}"
+            )
 
             # Helper to convert degrees around front to index (clamped)
             def deg_to_idx(deg: float) -> int:
-                i = int(self._idx_zero + (deg / self._deg_per_index))
-                return max(0, min(self._idx_n - 1, i))
+                # FIX: Use modular wrap to support [0, 2pi] scans where negative degrees wrap to end
+                i_float = self._idx_zero + (deg / self._deg_per_index)
+                i = int(round(i_float)) % self._idx_n
+                return i
 
             # Precompute sector index ranges based on configured degrees
             half_front = 0.5 * self._front_cone_deg
@@ -203,13 +220,16 @@ class JetbotAvoider(Node):
             return []
 
         def deg_to_idx(deg: float) -> int:
-            i = int(self._idx_zero + (deg / self._deg_per_index))
-            return max(0, min(self._idx_n - 1, i))
+            # FIX: Modular wrap to handle sectors that cross index boundaries
+            i_float = self._idx_zero + (deg / self._deg_per_index)
+            return int(round(i_float)) % self._idx_n
 
         i0, i1 = deg_to_idx(min_deg), deg_to_idx(max_deg)
-        if i0 > i1:
-            i0, i1 = i1, i0
-        sector = list(scan.ranges[i0 : i1 + 1])
+        if i0 <= i1:
+            sector = list(scan.ranges[i0 : i1 + 1])
+        else:
+            # FIX: Sector crosses the array end; concatenate wrapped slices
+            sector = list(scan.ranges[i0:]) + list(scan.ranges[: i1 + 1])
         return self._finite_values(sector)
 
     @staticmethod
