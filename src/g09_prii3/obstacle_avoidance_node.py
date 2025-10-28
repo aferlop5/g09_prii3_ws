@@ -35,6 +35,8 @@ class JetbotAvoider(Node):
         self.declare_parameter('advanced_rotate_factor', 1.2)
         # Advanced-only: front cone aperture in degrees (total span)
         self.declare_parameter('advanced_front_cone_deg', 90.0)
+    # Advanced-only: factor to keep a wider lateral clearance during avoidance
+    self.declare_parameter('safe_clearance_factor', 1.8)
 
         # Resolve params
         self._v = float(self.get_parameter('linear_speed').get_parameter_value().double_value)
@@ -48,6 +50,9 @@ class JetbotAvoider(Node):
         )
         self._rotate_factor = float(
             self.get_parameter('advanced_rotate_factor').get_parameter_value().double_value or 1.05
+        )
+        self._safe_clearance_factor = float(
+            self.get_parameter('safe_clearance_factor').get_parameter_value().double_value or 1.8
         )
         try:
             front_cone_param = float(
@@ -86,6 +91,14 @@ class JetbotAvoider(Node):
 
         # Advanced-mode smoothing: keep short history of front distance
         self._front_hist: Deque[float] = deque(maxlen=3)
+
+    # Advanced-mode return-to-straight helpers
+    self._recenter_active: bool = False
+    self._recenter_start_sec: Optional[float] = None
+    self._recenter_duration: float = 1.5  # seconds to ramp angular speed down to 0
+    self._return_dir: int = 0  # opposite sign of last avoidance to recenter
+    self._last_dir_change_sec: Optional[float] = None  # rate limit direction flips
+    self._clear_since_sec: Optional[float] = None  # time since front is clear over resume
 
         # LIDAR indexing cache (computed on first scan or when scan meta changes)
         self._idx_ready: bool = False
@@ -327,7 +340,7 @@ class JetbotAvoider(Node):
             if d_front_base is not None:
                 self._front_hist.append(d_front_base)  # FIX: smoothing based on _front_distance()
             # Compute smoothed front distance
-            if self._front_hist:
+            if self._mode == 'advanced':
                 d_front_smooth = sum(self._front_hist) / len(self._front_hist)
             else:
                 d_front_smooth = d_front_base if d_front_base is not None else d_front_simple  # FIX
@@ -350,32 +363,70 @@ class JetbotAvoider(Node):
                     # No side info: rotate to search using last direction
                     turn_dir = self._last_turn_dir
                     self._set_state('avoid_left' if turn_dir > 0 else 'avoid_right', 'escaneo insuficiente')
+                now = self._now_sec()
+
+                # Safety: never advance if too close to front
+                too_close = (d_front_smooth is not None) and (d_front_smooth < 0.9 * self._threshold)
+
+                # Re-centering phase: gradually reduce rotation to 0 and keep reduced forward speed
+                if self._recenter_active and self._recenter_start_sec is not None:
+                    t = now - self._recenter_start_sec
+                    if t >= self._recenter_duration:
+                        # End recentering
+                        self._recenter_active = False
+                        self._recenter_start_sec = None
+                        self._return_dir = 0
+                        # fall through to normal forward/advanced handling
+                    else:
+                        w_scale = max(0.0, 1.0 - (t / self._recenter_duration))
+                        wz = self._w * w_scale * (-1 if self._return_dir >= 0 else +1)
+                        vx = self._v * 0.6 if not too_close else 0.0
+                        self._publish(vx, wz)
+                        return
+
                     self._avoid_start_sec = self._avoid_start_sec or self._now_sec()
                     self._publish(0.0, self._w * self._search_w_factor * turn_dir)
                     return
+                    if left_clear is None and right_clear is None:
+                        # Both sides unknown: rotate in place slowly using last direction
+                        turn_dir = self._last_turn_dir or +1
+                        self._set_state('avoid_left' if turn_dir > 0 else 'avoid_right', 'escaneo insuficiente')
+                        self._avoid_start_sec = self._avoid_start_sec or now
+                        self._publish(0.0, self._w * self._search_w_factor * 0.7 * turn_dir)
+                        return
 
-                if right_clear is None or (left_clear is not None and left_clear > right_clear):
-                    desired_dir = +1
-                else:
-                    desired_dir = -1
+                    # Prefer side with greater margin above safe clearance threshold
+                    clear_req = self._threshold * self._safe_clearance_factor
+                    left_margin = (left_clear - clear_req) if (left_clear is not None) else -1e9
+                    right_margin = (right_clear - clear_req) if (right_clear is not None) else -1e9
 
-                now = self._now_sec()
-                # Direction persistence: do not flip within first 0.5s of avoidance
-                if self._state in ('avoid_left', 'avoid_right') and self._avoid_start_sec is not None:
-                    if (now - self._avoid_start_sec) < 0.5:
-                        turn_dir = self._last_turn_dir
-                    else:
-                        turn_dir = desired_dir
-                else:
+                    if left_margin <= 0.0 and right_margin <= 0.0:
+                        # Both sides constrained: stop briefly and rotate in place slowly
+                        turn_dir = self._last_turn_dir or +1
+                        self._set_state('avoid_left' if turn_dir > 0 else 'avoid_right', 'ambos lados cerca')
+                        self._avoid_start_sec = self._avoid_start_sec or now
+                        self._publish(0.0, self._w * self._search_w_factor * 0.7 * turn_dir)
+                        return
+
+                    desired_dir = +1 if left_margin > right_margin else -1
+
+                    # Rate-limit direction flips to at most once per second
+                    turn_dir = desired_dir
+                    if self._last_dir_change_sec is not None and desired_dir != self._last_turn_dir:
+                        if (now - self._last_dir_change_sec) < 1.0:
+                            turn_dir = self._last_turn_dir
+                    if turn_dir != self._last_turn_dir:
+                        self._last_dir_change_sec = now
+                    self._last_turn_dir = turn_dir
                     turn_dir = desired_dir
 
                 # Update state text based on direction
                 if turn_dir > 0:
-                    self._set_state('avoid_left', None)
+                            turn_dir = self._last_turn_dir
                 else:
-                    self._set_state('avoid_right', None)
+                            turn_dir = self._last_turn_dir
 
-                # Prefer rotate-in-place when close (tight spaces)
+                        turn_dir = self._last_turn_dir
                 if d_check < (self._threshold * self._rotate_factor):
                     if self._avoid_start_sec is None:
                         self._avoid_start_sec = now
@@ -395,7 +446,8 @@ class JetbotAvoider(Node):
                     return
 
                 # Normal avoid: creep forward while turning toward chosen side
-                self._publish(self._v * self._creep_factor, self._w * turn_dir)
+                vx = (self._v * self._creep_factor) if not too_close else 0.0
+                self._publish(vx, self._w * turn_dir)
                 self._last_turn_dir = turn_dir
                 return
         else:
@@ -407,19 +459,41 @@ class JetbotAvoider(Node):
 
         # No obstacle — go forward (advanced: add hysteresis so we don't flip-flop)
         if self._mode == 'advanced':
-            # If we were avoiding, require a bit of extra clearance to resume
+            # If we were avoiding, require a bit of extra clearance to start recentering
             d_front_base = self._front_distance()  # FIX: same method as simple
             if d_front_base is not None:
                 # update smoothing too so resume uses recent history
                 self._front_hist.append(d_front_base)  # FIX
             d_front_smooth = sum(self._front_hist) / len(self._front_hist) if self._front_hist else d_front_base  # FIX
-            if self._state in ('avoid_left', 'avoid_right') and d_front_smooth is not None:
-                if d_front_smooth < self._threshold * self._resume_factor:
-                    # Keep avoiding in same direction gently
+
+            if self._state in ('avoid_left', 'avoid_right') and d_front_smooth is not None and not self._recenter_active:
+                if d_front_smooth >= self._threshold * self._resume_factor:
+                    # Start or continue counting clear time
+                    now2 = self._now_sec()
+                    if self._clear_since_sec is None:
+                        self._clear_since_sec = now2
+                    elif (now2 - self._clear_since_sec) >= 1.0:
+                        # Trigger recentering phase
+                        self._recenter_active = True
+                        self._recenter_start_sec = now2
+                        self._return_dir = -self._last_turn_dir
+                        # During recentering, we take over control at the top on next tick
+                        # Keep moving gently this tick
+                        self._publish(self._v * 0.6, self._w * 0.5 * (-1 if self._return_dir >= 0 else +1))
+                        return
+                    # Keep avoiding gently until we complete the 1s window
                     turn_dir = +1 if self._state == 'avoid_left' else -1
                     self._publish(self._v * self._creep_factor, self._w * turn_dir)
                     return
-                # Clear enough — drop back to forward
+                else:
+                    # Not clear enough; reset clear timer
+                    self._clear_since_sec = None
+
+            # When fully clear and not avoiding, reset timers/state trackers
+            if self._state not in ('avoid_left', 'avoid_right'):
+                self._clear_since_sec = None
+                self._recenter_active = False
+                self._recenter_start_sec = None
             # Reset avoid timer when resuming forward; keep last turn dir
             self._avoid_start_sec = None
 
