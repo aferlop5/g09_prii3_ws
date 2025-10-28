@@ -100,6 +100,10 @@ class JetbotAvoider(Node):
         self._last_dir_change_sec: Optional[float] = None  # rate limit direction flips
         self._clear_since_sec: Optional[float] = None  # time since front is clear over resume
 
+        # Advanced-mode deterministic sequence (no smoothing, no lateral detection)
+        self._adv_seq_state: str = 'idle'  # 'idle' | 'turn_r1' | 'forward_1' | 'turn_l2' | 'forward_2' | 'turn_r3'
+        self._adv_phase_start_sec: Optional[float] = None
+
         # LIDAR indexing cache (computed on first scan or when scan meta changes)
         self._idx_ready: bool = False
         self._idx_n: int = 0
@@ -248,13 +252,10 @@ class JetbotAvoider(Node):
         return vals_sorted[k]
 
     def _front_distance_adv(self) -> Optional[float]:
-        """More robust front distance: 20th percentile in +/- front_cone/2."""
-        half = 0.5 * self._front_cone_deg
-        vals = self._sector_values_by_deg(-half, +half)
-        # If angle info is missing or empty, fall back
-        if not vals:
-            return self._front_distance()
-        return self._percentile(vals, 20.0)
+        """Advanced front distance computed from the exact same index zone as simple.
+        Uses the same sector (first and last ~20 samples) to guarantee identical reference.
+        """
+        return self._front_distance()
 
     def _side_clearance_adv(self) -> Tuple[Optional[float], Optional[float]]:
         """Return representative clearances for left/right using side sectors.
@@ -334,115 +335,80 @@ class JetbotAvoider(Node):
 
         # Advanced vs simple behavior
         if self._mode == 'advanced':
-            # FIX: Use the same front distance method as simple mode
-            d_front_base = self._front_distance()  # FIX: same as simple
-            # Keep smoothing only in advanced
-            if d_front_base is not None:
-                self._front_hist.append(d_front_base)  # FIX: smoothing based on _front_distance()
-            # Compute smoothed front distance
-            d_front_smooth = (
-                sum(self._front_hist) / len(self._front_hist)
-                if self._front_hist
-                else (d_front_base if d_front_base is not None else d_front_simple)
-            )  # FIX
-
-            # Side clearances for decision and logging
-            left_clear, right_clear = self._side_clearance_adv()
-
-            # Compact debug log
-            def fmt(x: Optional[float]) -> str:
-                return f"{x:.2f}" if x is not None else "nan"
-
-            self.get_logger().info(
-                f"[ADV] front={fmt(d_front_smooth)} L={fmt(left_clear)} R={fmt(right_clear)} state={self._state}"
-            )
-
-            # Compute common timing and safety flags
+            # Optional check: compare simple vs advanced front distance reference
+            _chk_adv = self._front_distance_adv()
+            try:
+                s_val = f"{d_front_simple:.2f}" if d_front_simple is not None else "nan"
+                a_val = f"{_chk_adv:.2f}" if _chk_adv is not None else "nan"
+                self.get_logger().info(f"[CHECK] Simple={s_val} Advanced={a_val}")
+            except Exception:
+                pass
             now = self._now_sec()
-            too_close = (d_front_smooth is not None) and (d_front_smooth < 0.9 * self._threshold)
+            # Deterministic, step-based avoidance using only front distance
+            if self._adv_seq_state == 'idle':
+                if d_front_simple < self._threshold:
+                    # Start sequence: Turn right 90° (1/5)
+                    self._adv_seq_state = 'turn_r1'
+                    self._adv_phase_start_sec = now
+                    self.get_logger().info('[ADV] Girando derecha 1/5')
+                    self._publish(0.0, -self._w)
+                    return
+                # Not avoiding — let normal forward logic handle below
+            else:
+                # We are inside the sequence — compute durations on the fly
+                rot90_dur = (math.pi / 2.0) / max(abs(self._w), 1e-6)
+                fwd05_dur = 0.5 / max(self._v, 1e-6)
+                elapsed = 0.0 if self._adv_phase_start_sec is None else (now - self._adv_phase_start_sec)
 
-            # Re-centering phase runs only when active and before avoidance decisions
-            if self._recenter_active and self._recenter_start_sec is not None:
-                t = now - self._recenter_start_sec
-                if t >= self._recenter_duration:
-                    # End recentering
-                    self._recenter_active = False
-                    self._recenter_start_sec = None
-                    self._return_dir = 0
-                else:
-                    w_scale = max(0.0, 1.0 - (t / self._recenter_duration))
-                    wz = self._w * w_scale * (-1 if self._return_dir >= 0 else +1)
-                    vx = self._v * 0.6 if not too_close else 0.0
-                    self._publish(vx, wz)
+                if self._adv_seq_state == 'turn_r1':
+                    if elapsed >= rot90_dur:
+                        self._adv_seq_state = 'forward_1'
+                        self._adv_phase_start_sec = now
+                        self.get_logger().info('[ADV] Avanzando 2/5')
+                        self._publish(self._v, 0.0)
+                        return
+                    self._publish(0.0, -self._w)
                     return
 
-            d_check = d_front_smooth if d_front_smooth is not None else d_front_simple  # FIX
-            if d_check is not None and d_check < (self._threshold * self._adv_detect_factor):
-                # Determine desired turn direction based on clearances
-                if left_clear is None and right_clear is None:
-                    # Both sides unknown: rotate in place slowly using last direction
-                    turn_dir = self._last_turn_dir or +1
-                    self._set_state('avoid_left' if turn_dir > 0 else 'avoid_right', 'escaneo insuficiente')
-                    self._avoid_start_sec = self._avoid_start_sec or now
-                    self._publish(0.0, self._w * self._search_w_factor * 0.7 * turn_dir)
+                if self._adv_seq_state == 'forward_1':
+                    if elapsed >= fwd05_dur:
+                        self._adv_seq_state = 'turn_l2'
+                        self._adv_phase_start_sec = now
+                        self.get_logger().info('[ADV] Girando izquierda 3/5')
+                        self._publish(0.0, +self._w)
+                        return
+                    self._publish(self._v, 0.0)
                     return
 
-                # Prefer side with greater margin above safe clearance threshold
-                clear_req = self._threshold * self._safe_clearance_factor
-                left_margin = (left_clear - clear_req) if (left_clear is not None) else -1e9
-                right_margin = (right_clear - clear_req) if (right_clear is not None) else -1e9
-
-                if left_margin <= 0.0 and right_margin <= 0.0:
-                    # Both sides constrained: stop briefly and rotate in place slowly
-                    turn_dir = self._last_turn_dir or +1
-                    self._set_state('avoid_left' if turn_dir > 0 else 'avoid_right', 'ambos lados cerca')
-                    self._avoid_start_sec = self._avoid_start_sec or now
-                    self._publish(0.0, self._w * self._search_w_factor * 0.7 * turn_dir)
+                if self._adv_seq_state == 'turn_l2':
+                    if elapsed >= rot90_dur:
+                        self._adv_seq_state = 'forward_2'
+                        self._adv_phase_start_sec = now
+                        self.get_logger().info('[ADV] Avanzando 4/5')
+                        self._publish(self._v, 0.0)
+                        return
+                    self._publish(0.0, +self._w)
                     return
 
-                desired_dir = +1 if left_margin > right_margin else -1
-                # Rate-limit direction flips to at most once per second
-                turn_dir = desired_dir
-                if self._last_dir_change_sec is not None and desired_dir != self._last_turn_dir:
-                    if (now - self._last_dir_change_sec) < 1.0:
-                        turn_dir = self._last_turn_dir
-                if turn_dir != self._last_turn_dir:
-                    self._last_dir_change_sec = now
-                self._last_turn_dir = turn_dir
-
-                # Direction persistence: do not flip within first 0.5s of avoidance
-                if self._state in ('avoid_left', 'avoid_right') and self._avoid_start_sec is not None:
-                    if (now - self._avoid_start_sec) < 0.5:
-                        turn_dir = self._last_turn_dir
-
-                # Update state text based on direction
-                if turn_dir > 0:
-                    self._set_state('avoid_left', None)
-                else:
-                    self._set_state('avoid_right', None)
-                if d_check < (self._threshold * self._rotate_factor):
-                    if self._avoid_start_sec is None:
-                        self._avoid_start_sec = now
-                    self._publish(0.0, self._w * turn_dir)
-                    self._last_turn_dir = turn_dir
+                if self._adv_seq_state == 'forward_2':
+                    if elapsed >= fwd05_dur:
+                        self._adv_seq_state = 'turn_r3'
+                        self._adv_phase_start_sec = now
+                        self.get_logger().info('[ADV] Girando derecha 5/5 (rumbo original)')
+                        self._publish(0.0, -self._w)
+                        return
+                    self._publish(self._v, 0.0)
                     return
 
-                # Stuck detection using smoothed front distance
-                if self._avoid_start_sec is None:
-                    self._avoid_start_sec = now
-                if d_check < (0.8 * self._threshold) and (now - self._avoid_start_sec) > self._stuck_timeout:
-                    # Strong rotate-in-place to break free
-                    self._publish(0.0, self._w * 1.5 * turn_dir)
-                    self._last_turn_dir = turn_dir
-                    # Reset timer after a rotate-in-place attempt
-                    self._avoid_start_sec = now
-                    return
-
-                # Normal avoid: creep forward while turning toward chosen side
-                vx = (self._v * self._creep_factor) if not too_close else 0.0
-                self._publish(vx, self._w * turn_dir)
-                self._last_turn_dir = turn_dir
-                return
+                if self._adv_seq_state == 'turn_r3':
+                    if elapsed >= rot90_dur:
+                        # End of sequence — resume normal forward
+                        self._adv_seq_state = 'idle'
+                        self._adv_phase_start_sec = None
+                        # fall through to normal forward below
+                    else:
+                        self._publish(0.0, -self._w)
+                        return
         else:
             # Simple mode detection as before
             if d_front_simple < self._threshold:
@@ -452,43 +418,9 @@ class JetbotAvoider(Node):
 
         # No obstacle — go forward (advanced: add hysteresis so we don't flip-flop)
         if self._mode == 'advanced':
-            # If we were avoiding, require a bit of extra clearance to start recentering
-            d_front_base = self._front_distance()  # FIX: same method as simple
-            if d_front_base is not None:
-                # update smoothing too so resume uses recent history
-                self._front_hist.append(d_front_base)  # FIX
-            d_front_smooth = sum(self._front_hist) / len(self._front_hist) if self._front_hist else d_front_base  # FIX
-
-            if self._state in ('avoid_left', 'avoid_right') and d_front_smooth is not None and not self._recenter_active:
-                if d_front_smooth >= self._threshold * self._resume_factor:
-                    # Start or continue counting clear time
-                    now2 = self._now_sec()
-                    if self._clear_since_sec is None:
-                        self._clear_since_sec = now2
-                    elif (now2 - self._clear_since_sec) >= 1.0:
-                        # Trigger recentering phase
-                        self._recenter_active = True
-                        self._recenter_start_sec = now2
-                        self._return_dir = -self._last_turn_dir
-                        # During recentering, we take over control at the top on next tick
-                        # Keep moving gently this tick
-                        self._publish(self._v * 0.6, self._w * 0.5 * (-1 if self._return_dir >= 0 else +1))
-                        return
-                    # Keep avoiding gently until we complete the 1s window
-                    turn_dir = +1 if self._state == 'avoid_left' else -1
-                    self._publish(self._v * self._creep_factor, self._w * turn_dir)
-                    return
-                else:
-                    # Not clear enough; reset clear timer
-                    self._clear_since_sec = None
-
-            # When fully clear and not avoiding, reset timers/state trackers
-            if self._state not in ('avoid_left', 'avoid_right'):
-                self._clear_since_sec = None
-                self._recenter_active = False
-                self._recenter_start_sec = None
-            # Reset avoid timer when resuming forward; keep last turn dir
-            self._avoid_start_sec = None
+            # If not running a sequence, just go forward here
+            if self._adv_seq_state == 'idle':
+                self._avoid_start_sec = None
 
         if self._state != 'forward':
             # Transition log happens in _set_state
