@@ -161,18 +161,12 @@ class JetbotAvoider(Node):
             or abs(angle_span_deg - self._angle_span_deg) > 1e-6
         ):
             self._idx_n = n
-            # FIX: Choose front index depending on scan angular range
+            # FIX: Force front index to 0 to match simple mode (front at array edges)
+            # Many JetBot/TurtleBot3 setups publish scans from ~0 to ~2π, where index 0 (and n-1) look forward.
+            # Advanced mode will share this reference to ensure front sectors coincide with simple mode.
             min_rad = float(scan.angle_min)
             max_rad = float(scan.angle_max)
-            # If angles cover roughly [-pi, +pi], front is in the middle
-            if (min_rad <= -math.pi + 0.2) and (max_rad >= math.pi - 0.2):  # FIX:
-                self._idx_zero = n // 2  # FIX:
-            # If angles cover roughly [0, 2*pi], front is at index 0
-            elif (min_rad >= -0.2) and (max_rad >= 2.0 * math.pi - 0.2) and (max_rad <= 2.0 * math.pi + 0.2):  # FIX:
-                self._idx_zero = 0  # FIX:
-            else:
-                # Fallback to center
-                self._idx_zero = n // 2  # FIX:
+            self._idx_zero = 0  # FIX:
             # Degrees per index from total FoV; independent of angle_min origin
             self._angle_span_deg = angle_span_deg
             self._deg_per_index = (angle_span_deg / max(1, n))
@@ -327,16 +321,16 @@ class JetbotAvoider(Node):
 
         # Advanced vs simple behavior
         if self._mode == 'advanced':
-            # Detect earlier in advanced mode using robust front and a multiplier
-            d_front_adv = self._front_distance_adv()
-            # Update smoothing history
-            if d_front_adv is not None:
-                self._front_hist.append(d_front_adv)
+            # FIX: Use the same front distance method as simple mode
+            d_front_base = self._front_distance()  # FIX: same as simple
+            # Keep smoothing only in advanced
+            if d_front_base is not None:
+                self._front_hist.append(d_front_base)  # FIX: smoothing based on _front_distance()
             # Compute smoothed front distance
             if self._front_hist:
                 d_front_smooth = sum(self._front_hist) / len(self._front_hist)
             else:
-                d_front_smooth = d_front_adv if d_front_adv is not None else d_front_simple
+                d_front_smooth = d_front_base if d_front_base is not None else d_front_simple  # FIX
 
             # Side clearances for decision and logging
             left_clear, right_clear = self._side_clearance_adv()
@@ -349,7 +343,7 @@ class JetbotAvoider(Node):
                 f"[ADV] front={fmt(d_front_smooth)} L={fmt(left_clear)} R={fmt(right_clear)} state={self._state}"
             )
 
-            d_check = d_front_smooth if d_front_smooth is not None else d_front_simple
+            d_check = d_front_smooth if d_front_smooth is not None else d_front_simple  # FIX
             if d_check is not None and d_check < (self._threshold * self._adv_detect_factor):
                 # Determine desired turn direction based on clearances
                 if left_clear is None and right_clear is None:
@@ -414,11 +408,11 @@ class JetbotAvoider(Node):
         # No obstacle — go forward (advanced: add hysteresis so we don't flip-flop)
         if self._mode == 'advanced':
             # If we were avoiding, require a bit of extra clearance to resume
-            d_front_adv = self._front_distance_adv()
-            if d_front_adv is not None:
+            d_front_base = self._front_distance()  # FIX: same method as simple
+            if d_front_base is not None:
                 # update smoothing too so resume uses recent history
-                self._front_hist.append(d_front_adv)
-            d_front_smooth = sum(self._front_hist) / len(self._front_hist) if self._front_hist else d_front_adv
+                self._front_hist.append(d_front_base)  # FIX
+            d_front_smooth = sum(self._front_hist) / len(self._front_hist) if self._front_hist else d_front_base  # FIX
             if self._state in ('avoid_left', 'avoid_right') and d_front_smooth is not None:
                 if d_front_smooth < self._threshold * self._resume_factor:
                     # Keep avoiding in same direction gently
