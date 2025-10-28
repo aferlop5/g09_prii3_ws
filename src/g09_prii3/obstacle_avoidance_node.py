@@ -27,14 +27,14 @@ class JetbotAvoider(Node):
         # Parameters
         self.declare_parameter('linear_speed', 0.15)
         self.declare_parameter('angular_speed', 0.6)
-    self.declare_parameter('obstacle_threshold', 0.35)
+        self.declare_parameter('obstacle_threshold', 0.35)
         self.declare_parameter('avoidance_mode', 'simple')  # 'simple' | 'advanced'
         # Advanced-only sensitivity: detect earlier than threshold (multiplier > 1)
-    self.declare_parameter('advanced_detect_factor', 1.8)
+        self.declare_parameter('advanced_detect_factor', 1.8)
         # Advanced-only: prefer rotate-in-place when close (>=1.0 rotates even before threshold)
-    self.declare_parameter('advanced_rotate_factor', 1.2)
+        self.declare_parameter('advanced_rotate_factor', 1.2)
         # Advanced-only: front cone aperture in degrees (total span)
-    self.declare_parameter('advanced_front_cone_deg', 90.0)
+        self.declare_parameter('advanced_front_cone_deg', 90.0)
 
         # Resolve params
         self._v = float(self.get_parameter('linear_speed').get_parameter_value().double_value)
@@ -84,19 +84,19 @@ class JetbotAvoider(Node):
         self._last_turn_dir: int = +1  # +1 left, -1 right (advanced)
         self._avoid_start_sec: Optional[float] = None
 
-    # Advanced-mode smoothing: keep short history of front distance
-    self._front_hist: Deque[float] = deque(maxlen=3)
+        # Advanced-mode smoothing: keep short history of front distance
+        self._front_hist: Deque[float] = deque(maxlen=3)
 
-    # LIDAR indexing cache (computed on first scan or when scan meta changes)
-    self._idx_ready: bool = False
-    self._idx_n: int = 0
-    self._idx_zero: int = 0
-    self._deg_per_index: float = 1.0  # degrees per index
-    self._angle_span_deg: float = 0.0
-    # Cached sector index ranges (inclusive tuples)
-    self._idx_front: Tuple[int, int] = (0, 0)
-    self._idx_left: Tuple[int, int] = (0, 0)
-    self._idx_right: Tuple[int, int] = (0, 0)
+        # LIDAR indexing cache (computed on first scan or when scan meta changes)
+        self._idx_ready: bool = False
+        self._idx_n: int = 0
+        self._idx_zero: int = 0
+        self._deg_per_index: float = 1.0  # degrees per index
+        self._angle_span_deg: float = 0.0
+        # Cached sector index ranges (inclusive tuples)
+        self._idx_front: Tuple[int, int] = (0, 0)
+        self._idx_left: Tuple[int, int] = (0, 0)
+        self._idx_right: Tuple[int, int] = (0, 0)
 
         # Advanced-mode tuning (does not affect simple mode)
         self._resume_factor = 1.25  # need a bit more clearance before resuming forward
