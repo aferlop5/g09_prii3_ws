@@ -168,7 +168,7 @@ class JetbotAvoider(Node):
             if (min_rad <= -math.pi + 0.2) and (max_rad >= math.pi - 0.2):  # FIX:
                 self._idx_zero = n // 2  # FIX:
             # If angles cover roughly [0, 2*pi], front is at index 0
-            elif (min_rad >= -1e-3) and (max_rad <= 2.0 * math.pi + 0.2):  # FIX:
+            elif (min_rad >= -0.2) and (max_rad >= 2.0 * math.pi - 0.2) and (max_rad <= 2.0 * math.pi + 0.2):  # FIX:
                 self._idx_zero = 0  # FIX:
             else:
                 # Fallback to center
