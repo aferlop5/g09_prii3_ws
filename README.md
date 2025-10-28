@@ -94,6 +94,18 @@ source install/setup.bash
 
 ---
 
+Requisito previo para mover el robot (JetBot)
+---
+Antes de lanzar cualquier nodo que haga que el robot se mueva (por ejemplo, `jetbot_drawer`, evitación de obstáculos o navegación), asegúrate de tener ejecutado en OTRA terminal el stack del JetBot:
+
+```bash
+ros2 launch jetbot_pro_ros2 jetbot.py
+```
+
+Déjalo corriendo mientras lanzas tus nodos desde otra terminal. Sin este proceso activo, los comandos de velocidad (`/cmd_vel`) no llegarán al controlador del robot.
+
+---
+
 Solución a "Package 'g09_prii3' not found"
 ---
 Si al lanzar ves un error como:
@@ -339,19 +351,6 @@ Recursos y enlaces rápidos
 ---
 Notas
 - El launch exporta automáticamente `TURTLEBOT3_MODEL=burger` y abre `turtlebot3_world.launch.py`.
-- Puedes cambiar la meta con `goal_x`, `goal_y` (en metros, frame `odom`).
-- El primer entrenamiento puede tardar; el modelo se guarda en `~/.g09_prii3/models/ppo_tb3_goal_<x>_<y>.zip` y se recarga si lanzas de nuevo con la misma meta.
-- Si no tienes `turtlebot3_gazebo` instalado, instálalo según tu distro ROS 2 (p. ej. `sudo apt install ros-foxy-turtlebot3-gazebo`).
-
-Ejecutar solo el nodo (si ya tienes Gazebo y TB3 corriendo)
-```bash
-ros2 run g09_prii3 ml_test --ros-args -p goal_x:=1.0 -p goal_y:=0.0 -p total_timesteps:=5000 -p algorithm:=PPO
-```
-
-Solución de problemas
-- Error de importación SB3/torch/gymnasium: instala los requisitos Python indicados arriba.
-- No arranca Gazebo: comprueba que el paquete `turtlebot3_gazebo` está instalado y que tu shell está sourceada (`source /opt/ros/<distro>/setup.bash`).
-- El robot no se mueve: verifica que Gazebo está corriendo, que `/scan` y `/odom` publican, y que no hay colisiones inmediatas.
 
 
 <center>
