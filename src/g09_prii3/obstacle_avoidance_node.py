@@ -101,7 +101,7 @@ class JetbotAvoider(Node):
         self._clear_since_sec: Optional[float] = None  # time since front is clear over resume
 
         # Advanced-mode deterministic sequence (no smoothing, no lateral detection)
-        self._adv_seq_state: str = 'idle'  # 'idle' | 'turn_r1' | 'forward_1' | 'turn_l2' | 'forward_2' | 'turn_r3'
+        self._adv_seq_state: str = 'idle'  # 'idle' | 'turn_r1' | 'forward_1' | 'turn_l2' | 'forward_2' | 'turn_l3' | 'forward_3' | 'turn_r4'
         self._adv_phase_start_sec: Optional[float] = None
 
         # LIDAR indexing cache (computed on first scan or when scan meta changes)
@@ -347,10 +347,10 @@ class JetbotAvoider(Node):
             # Deterministic, step-based avoidance using only front distance
             if self._adv_seq_state == 'idle':
                 if d_front_simple < self._threshold:
-                    # Start sequence: Turn right 90° (1/5)
+                    # Start sequence: Turn right 90° (1/7)
                     self._adv_seq_state = 'turn_r1'
                     self._adv_phase_start_sec = now
-                    self.get_logger().info('[ADV] Girando derecha 1/5')
+                    self.get_logger().info('[ADV] Girando derecha 1/7')
                     self._publish(0.0, -self._w)
                     return
                 # Not avoiding — let normal forward logic handle below
@@ -364,7 +364,7 @@ class JetbotAvoider(Node):
                     if elapsed >= rot90_dur:
                         self._adv_seq_state = 'forward_1'
                         self._adv_phase_start_sec = now
-                        self.get_logger().info('[ADV] Avanzando 2/5')
+                        self.get_logger().info('[ADV] Avanzando 2/7')
                         self._publish(self._v, 0.0)
                         return
                     self._publish(0.0, -self._w)
@@ -374,7 +374,7 @@ class JetbotAvoider(Node):
                     if elapsed >= fwd05_dur:
                         self._adv_seq_state = 'turn_l2'
                         self._adv_phase_start_sec = now
-                        self.get_logger().info('[ADV] Girando izquierda 3/5')
+                        self.get_logger().info('[ADV] Girando izquierda 3/7')
                         self._publish(0.0, +self._w)
                         return
                     self._publish(self._v, 0.0)
@@ -384,7 +384,7 @@ class JetbotAvoider(Node):
                     if elapsed >= rot90_dur:
                         self._adv_seq_state = 'forward_2'
                         self._adv_phase_start_sec = now
-                        self.get_logger().info('[ADV] Avanzando 4/5')
+                        self.get_logger().info('[ADV] Avanzando 4/7')
                         self._publish(self._v, 0.0)
                         return
                     self._publish(0.0, +self._w)
@@ -392,15 +392,36 @@ class JetbotAvoider(Node):
 
                 if self._adv_seq_state == 'forward_2':
                     if elapsed >= fwd05_dur:
-                        self._adv_seq_state = 'turn_r3'
+                        # NEW: extra left turn before the final right turn
+                        self._adv_seq_state = 'turn_l3'
                         self._adv_phase_start_sec = now
-                        self.get_logger().info('[ADV] Girando derecha 5/5 (rumbo original)')
+                        self.get_logger().info('[ADV] Girando izquierda 5/7')
+                        self._publish(0.0, +self._w)
+                        return
+                    self._publish(self._v, 0.0)
+                    return
+
+                if self._adv_seq_state == 'turn_l3':
+                    if elapsed >= rot90_dur:
+                        self._adv_seq_state = 'forward_3'
+                        self._adv_phase_start_sec = now
+                        self.get_logger().info('[ADV] Avanzando 6/7')
+                        self._publish(self._v, 0.0)
+                        return
+                    self._publish(0.0, +self._w)
+                    return
+
+                if self._adv_seq_state == 'forward_3':
+                    if elapsed >= fwd05_dur:
+                        self._adv_seq_state = 'turn_r4'
+                        self._adv_phase_start_sec = now
+                        self.get_logger().info('[ADV] Girando derecha 7/7 (rumbo original)')
                         self._publish(0.0, -self._w)
                         return
                     self._publish(self._v, 0.0)
                     return
 
-                if self._adv_seq_state == 'turn_r3':
+                if self._adv_seq_state == 'turn_r4':
                     if elapsed >= rot90_dur:
                         # End of sequence — resume normal forward
                         self._adv_seq_state = 'idle'
