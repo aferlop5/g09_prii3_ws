@@ -230,6 +230,13 @@ Qué lanzan los modos y en qué se diferencian. Mismo ejecutable, dos launch par
 - Simulación (Gazebo con TurtleBot3 burger)
   - Si Gazebo ya está abierto con un robot que publique `/scan` y escuche `/cmd_vel` (p. ej., TurtleBot3), cualquiera de los dos launch anteriores (simple o advanced) funcionará en la simulación sin cambios.
   - Requisito: tener `turtlebot3_gazebo` instalado si deseas abrir la simulación estándar de TurtleBot3.
+
+Argumentos para usar un único nodo con dos launch files
+- Parámetros configurables: el mismo nodo acepta parámetros ROS (por ejemplo, `avoidance_mode`) que cambian completamente el comportamiento entre modo simple y avanzado.
+- Mantenimiento centralizado: todas las mejoras y correcciones se aplican una sola vez en un único archivo de nodo, evitando duplicación de código.
+- Configuración específica: cada launch file establece parámetros diferentes (p. ej., `obstacle_threshold`, `advanced_detect_factor`, etc.) optimizados para cada modo.
+- Flexibilidad operativa: permite cambiar entre comportamientos sin recompilar, solo modificando parámetros de lanzamiento.
+- Consistencia garantizada: ambos modos comparten la misma lógica base de procesado LIDAR y publicación a `/cmd_vel`.
 ---
 
 
