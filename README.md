@@ -230,19 +230,6 @@ Qué lanzan los modos y en qué se diferencian. Mismo ejecutable, dos launch par
 - Simulación (Gazebo con TurtleBot3 burger)
   - Si Gazebo ya está abierto con un robot que publique `/scan` y escuche `/cmd_vel` (p. ej., TurtleBot3), cualquiera de los dos launch anteriores (simple o advanced) funcionará en la simulación sin cambios.
   - Requisito: tener `turtlebot3_gazebo` instalado si deseas abrir la simulación estándar de TurtleBot3.
-
-Por qué dos launch (decisión de diseño)
-- Especialización específica: cada launch activa el modo deseado sin condicionales en código.
-- Mantenimiento simplificado: responsabilidades claras por archivo (simple vs advanced).
-- Configuración directa: menos parámetros, menos errores de uso.
-- Depuración más eficiente: facilita aislar problemas de comportamiento entre modos.
-
-Detalles del nodo
-- Nodo: `jetbot_obstacle_avoidance`
-- Archivo: [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py) — clase [`JetbotAvoider`](src/g09_prii3/obstacle_avoidance_node.py)
-- Tópicos: Sub `/scan` (sensor_msgs/LaserScan), Pub `/cmd_vel` (geometry_msgs/Twist)
-- Parámetros clave: `linear_speed`, `angular_speed`, `obstacle_threshold`, `avoidance_mode` (`simple` | `advanced`)
-
 ---
 
 
