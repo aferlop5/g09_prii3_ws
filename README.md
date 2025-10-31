@@ -24,6 +24,7 @@ g09_prii3_ws/
 ├─ launch/
 │  ├─ sprint1.launch.py
 │  ├─ jetbot_drawer.launch.py
+│  ├─ drawer_number_gazebo.launch.py
 │  ├─ obstacle_avoidance_simple.launch.py
 │  ├─ obstacle_avoidance_advanced.launch.py
 │  ├─ Potential_Fields.launch.py
@@ -54,6 +55,7 @@ Archivos clave (abre con un clic)
 - [resource/g09_prii3](resource/g09_prii3)  
 - [launch/sprint1.launch.py](launch/sprint1.launch.py)  
 - [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)  
+- [launch/drawer_number_gazebo.launch.py](launch/drawer_number_gazebo.launch.py)  
 - [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)  
 - [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)  
 - [launch/Potential_Fields.launch.py](launch/Potential_Fields.launch.py)  
@@ -200,6 +202,38 @@ También puedes lanzar con:
 ros2 launch g09_prii3 jetbot_drawer.launch.py
 ```
 Archivo de launch: [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)
+
+---
+
+Dibujo del número — Real vs Simulación (Gazebo)
+---
+Qué lanza el dibujo en cada entorno y por qué tenemos dos nodos/launch separados.
+
+- Robot real (JetBot)
+  - Launch: `launch/jetbot_drawer.launch.py`
+  - Ejecutable: `jetbot_drawer`
+  - Ejecuta el nodo que publica `/cmd_vel` para dibujar “09” en el hardware real.
+  - Asume que el stack del JetBot ya está corriendo y escuchando `/cmd_vel`.
+  - Cómo lanzarlo:
+    ```bash
+    ros2 launch g09_prii3 jetbot_drawer.launch.py
+    ```
+
+- Simulación (Gazebo con TurtleBot3 burger)
+  - Launch: `launch/drawer_number_gazebo.launch.py`
+  - Ejecutable: `drawer_number_gazebo`
+  - Este launch configura `TURTLEBOT3_MODEL=burger`, abre `turtlebot3_gazebo/empty_world.launch.py` y, tras unos segundos, arranca el nodo que publica `/cmd_vel` para dibujar “9”.
+  - Requiere tener instalado el paquete `turtlebot3_gazebo`.
+  - Cómo lanzarlo:
+    ```bash
+    ros2 launch g09_prii3 drawer_number_gazebo.launch.py
+    ```
+
+Por qué dos nodos/launch (decisión de diseño)
+- Especialización específica: Cada nodo está optimizado para su entorno sin código condicional complejo. El launch de Gazebo levanta el simulador y el entorno, mientras que el de JetBot asume el robot real ya está listo.
+- Mantenimiento simplificado: Código más limpio y fácil de actualizar por separado. Los launch files tienen responsabilidades claras: uno para simulación (con Gazebo) y otro para el robot real (sin Gazebo).
+- Configuración directa: Launch files específicos que evitan parámetros condicionales y errores. El launch de Gazebo incluye la puesta en marcha del simulador, mientras que el de JetBot se enfoca solo en el control del robot real.
+- Depuración más eficiente: Problemas identificados más rápido al tener responsabilidades separadas. Al lanzar Gazebo en un launch y el robot real en otro, se aísla mejor los problemas de simulación de los del hardware.
 
 Evitación de obstáculos con Lidar (Sprint 2)
 ---
@@ -350,7 +384,7 @@ Recursos y enlaces rápidos
 
 ---
 Notas
-- El launch exporta automáticamente `TURTLEBOT3_MODEL=burger` y abre `turtlebot3_world.launch.py`.
+- El launch `drawer_number_gazebo.launch.py` exporta automáticamente `TURTLEBOT3_MODEL=burger` e incluye `turtlebot3_gazebo/empty_world.launch.py`.
 
 
 <center>
