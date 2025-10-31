@@ -243,20 +243,6 @@ Archivos de launch:
 
 Nota: para el dibujo del "09" usa `jetbot_drawer.launch.py`. Para evitación de obstáculos usa uno de los launch dedicados indicados arriba.
 
-
-Ejercicios — Gazebo / TurtleBot3
----
-Nodo: `drawer_number` (simulación / TB3)  
-Archivo: [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py) — clase [`TurtlebotNine`](src/g09_prii3/drawer_number_gazebo.py)
-
-Descripción
-- Publica en `/cmd_vel` y termina al completar la secuencia. Diseñado para pruebas en simulador (Gazebo / TurtleBot3).
-
-Ejecución directa:
-```bash
-ros2 run g09_prii3 drawer_number_gazebo
-```
-
 ---
 
 Navegación — Campos Potenciales (JetBot / Gazebo)
