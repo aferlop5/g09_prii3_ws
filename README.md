@@ -179,34 +179,6 @@ ros2 service call /drawer/restart std_srvs/srv/Trigger "{}"
 
 Sprint 2 — JetBot
 ---
-Nodo: `jetbot_drawer`  
-Archivo: [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)
-
-Descripción
-- Publica comandos en `/cmd_vel` para que el stack de JetBot (o un controlador compatible) reproduzca la trayectoria "09". Parámetros de velocidad declarables (`linear_speed`, `angular_speed`).
-
-Ejecución (si está instalado con setup.py)
-```bash
-ros2 run g09_prii3 jetbot_drawer
-```
-
-Servicios asociados
-```bash
-ros2 service call /jetbot_drawer/pause   std_srvs/srv/Trigger {}
-ros2 service call /jetbot_drawer/resume  std_srvs/srv/Trigger {}
-ros2 service call /jetbot_drawer/restart std_srvs/srv/Trigger {}
-```
-
-También puedes lanzar con:
-```bash
-ros2 launch g09_prii3 jetbot_drawer.launch.py
-```
-Archivo de launch: [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)
-
----
-
-Dibujo del número — Real vs Simulación (Gazebo)
----
 Qué lanza el dibujo en cada entorno y por qué tenemos dos nodos/launch separados.
 
 - Robot real (JetBot)
