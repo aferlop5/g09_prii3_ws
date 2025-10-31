@@ -207,43 +207,45 @@ Por qué dos nodos/launch (decisión de diseño)
 - Configuración directa: Launch files específicos que evitan parámetros condicionales y errores. El launch de Gazebo incluye la puesta en marcha del simulador, mientras que el de JetBot se enfoca solo en el control del robot real.
 - Depuración más eficiente: Problemas identificados más rápido al tener responsabilidades separadas. Al lanzar Gazebo en un launch y el robot real en otro, se aísla mejor los problemas de simulación de los del hardware.
 
-Evitación de obstáculos con Lidar (Sprint 2)
+Sprint 2 — Evitación de obstáculos
 ---
-Nodo: `jetbot_obstacle_avoidance`  
-Archivo: [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py) — clase [`JetbotAvoider`](src/g09_prii3/obstacle_avoidance_node.py)
+Qué lanzan los modos y en qué se diferencian. Mismo ejecutable, dos launch para dos comportamientos.
 
-Descripción
-- Publica velocidad en `/cmd_vel` y se suscribe a `/scan` (Lidar) para detectar obstáculos.
-- Modo `simple`: se detiene si un obstáculo está más cerca que un umbral (por defecto 0.3 m) y reanuda cuando despeja.
-- Modo `advanced`: esquiva el obstáculo girando hacia el lado con mayor despeje mientras avanza lentamente.
-- Logs informativos: "Avanzando", "obstáculo detectado — deteniendo", "evitando obstáculo", etc.
+- Robot real (JetBot)
+  - Launch (modo simple): `launch/obstacle_avoidance_simple.launch.py`
+  - Launch (modo advanced): `launch/obstacle_avoidance_advanced.launch.py`
+  - Ejecutable: `jetbot_obstacle_avoidance`
+  - Comportamiento:
+    - Simple → "collision avoidance": se para delante del obstáculo y reanuda cuando desaparece.
+    - Advanced → "obstacle avoidance": esquiva el obstáculo bordeándolo sin detener la marcha.
+  - Cómo lanzarlo:
+    ```bash
+    # Simple (para y reanuda)
+    ros2 launch g09_prii3 obstacle_avoidance_simple.launch.py
 
-Parámetros
-- `linear_speed` (float, default 0.15): velocidad lineal (m/s)
-- `angular_speed` (float, default 0.6): velocidad angular (rad/s)
-- `obstacle_threshold` (float, default 0.3): umbral de detección frontal (m)
-- `avoidance_mode` (string, default `simple`): `simple` | `advanced`
+    # Advanced (evita en marcha)
+    ros2 launch g09_prii3 obstacle_avoidance_advanced.launch.py
+    ```
 
-Ejecución directa
-```bash
-ros2 run g09_prii3 jetbot_obstacle_avoidance
-```
+- Simulación (Gazebo con TurtleBot3 burger)
+  - Si Gazebo ya está abierto con un robot que publique `/scan` y escuche `/cmd_vel` (p. ej., TurtleBot3), cualquiera de los dos launch anteriores (simple o advanced) funcionará en la simulación sin cambios.
+  - Requisito: tener `turtlebot3_gazebo` instalado si deseas abrir la simulación estándar de TurtleBot3.
 
-Launch dedicados por modo (sin parámetros)
-```bash
-# Modo simple (se detiene ante el obstáculo y reanuda cuando despeja)
-ros2 launch g09_prii3 obstacle_avoidance_simple.launch.py
+Por qué dos launch (decisión de diseño)
+- Especialización específica: cada launch activa el modo deseado sin condicionales en código.
+- Mantenimiento simplificado: responsabilidades claras por archivo (simple vs advanced).
+- Configuración directa: menos parámetros, menos errores de uso.
+- Depuración más eficiente: facilita aislar problemas de comportamiento entre modos.
 
-# Modo avanzado (evita el obstáculo girando y avanzando lentamente)
-ros2 launch g09_prii3 obstacle_avoidance_advanced.launch.py
-```
-Archivos de launch:
-- [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)
-- [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)
-
-Nota: para el dibujo del "09" usa `jetbot_drawer.launch.py`. Para evitación de obstáculos usa uno de los launch dedicados indicados arriba.
+Detalles del nodo
+- Nodo: `jetbot_obstacle_avoidance`
+- Archivo: [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py) — clase [`JetbotAvoider`](src/g09_prii3/obstacle_avoidance_node.py)
+- Tópicos: Sub `/scan` (sensor_msgs/LaserScan), Pub `/cmd_vel` (geometry_msgs/Twist)
+- Parámetros clave: `linear_speed`, `angular_speed`, `obstacle_threshold`, `avoidance_mode` (`simple` | `advanced`)
 
 ---
+
+
 
 Navegación — Campos Potenciales (JetBot / Gazebo)
 ---
