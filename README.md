@@ -381,6 +381,7 @@ En nuestro caso específico, esta relación se define como:
 - Posición equivalente en RViz: (0, 0)
 
 Solución Implementada
+
 Para resolver esta discrepancia, implementamos un nodo que gestiona automáticamente la transformación de coordenadas mediante la relación:
 ```text
 x_mapa = x_gazebo + 2.0
