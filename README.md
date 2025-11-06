@@ -373,6 +373,7 @@ ros2 launch g09_prii3 rviz_predefinido_node.launch.py
 ```
 
 Sistema de Coordenadas: Gazebo vs RViz
+
 Durante el desarrollo identificamos una discrepancia fundamental entre los sistemas de coordenadas de Gazebo y RViz. Los mapas generados con Cartographer en RViz utilizan un sistema de coordenadas diferente al mundo de simulación de Gazebo, donde el origen (0,0) en RViz corresponde exactamente a la posición de spawn inicial del robot en Gazebo.
 
 En nuestro caso específico, esta relación se define como:
