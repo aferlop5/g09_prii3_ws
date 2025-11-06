@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Script de calibración de cámara con OpenCV
-# - Busca automáticamente imágenes .jpg en la misma carpeta que el script
+# - Busca automáticamente imágenes .jpg en la carpeta "dataset_calibracion" dentro
+#   del directorio de este script (calibracion/dataset_calibracion)
 # - Detecta tablero de ajedrez (por defecto 9x6 esquinas internas, ajustable)
 # - Reporta progreso y estadísticas en la terminal
 # - Calibra usando solo detecciones exitosas
@@ -75,7 +76,14 @@ def main():
 
     # Directorio del script y búsqueda de imágenes en el mismo directorio
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    image_paths = find_calibration_images(script_dir)
+    dataset_dir = os.path.join(script_dir, "dataset_calibracion")
+
+    if not os.path.isdir(dataset_dir):
+        print(f"ERROR: No se encontró la carpeta de dataset: {dataset_dir}", file=sys.stderr, flush=True)
+        print("Crea la carpeta 'calibracion/dataset_calibracion' y coloca dentro las imágenes de calibración.", file=sys.stderr, flush=True)
+        sys.exit(1)
+
+    image_paths = find_calibration_images(dataset_dir)
 
     # Configuración del patrón de tablero
     cols = int(args.cols)
@@ -92,7 +100,7 @@ def main():
     # Plantilla de puntos 3D del patrón
     objp_template = build_object_points(cols, rows, square_size)
 
-    print("Procesando imágenes de calibración...", flush=True)
+    print(f"Procesando imágenes de calibración en: {dataset_dir}", flush=True)
 
     # Criterio de refinamiento subpíxel para esquinas detectadas
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -141,6 +149,10 @@ def main():
 
     # Cálculo de métricas
     success_rate = int(round((detected / total) * 100)) if total > 0 else 0
+
+    if total == 0:
+        print("No se encontraron imágenes en la carpeta de dataset. Asegúrate de colocar imágenes .jpg/.png/.bmp.", flush=True)
+        sys.exit(1)
 
     print("=== RESUMEN DE CALIBRACIÓN ===", flush=True)
     print(f"Imágenes totales procesadas: {total}", flush=True)
