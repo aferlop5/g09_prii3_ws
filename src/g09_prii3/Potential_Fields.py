@@ -6,7 +6,6 @@ from nav_msgs.msg import Odometry
 import math
 import numpy as np
 import time
-from rclpy.qos import qos_profile_sensor_data
 
 # Minimal local implementation for yaw extraction from quaternion to avoid external deps here
 def euler_from_quaternion(q):
@@ -22,8 +21,8 @@ class PotentialFieldsNavigator(Node):
         super().__init__('potential_fields_nav')
         self.declare_parameter('k_att', 1.0)
         # Ajustes más "apurados": menor alcance y menor ganancia repulsiva por defecto
-        self.declare_parameter('k_rep', 0.22)
-        self.declare_parameter('d0_rep', 0.4)
+        self.declare_parameter('k_rep', 0.32)
+        self.declare_parameter('d0_rep', 0.55)
         self.declare_parameter('max_lin_vel', 0.3)
         self.declare_parameter('max_ang_vel', 1.0)
         self.declare_parameter('escape_gain', 0.2)
@@ -32,29 +31,35 @@ class PotentialFieldsNavigator(Node):
         # Parámetros nuevos
         self.declare_parameter('goal_tolerance', 0.1)
         self.declare_parameter('odom_topic', '/odom')
-        # Tópicos configurables para hardware real
-        self.declare_parameter('scan_topic', '/scan')
-        self.declare_parameter('cmd_vel_topic', '/cmd_vel')
         # Ganancias de control
         self.declare_parameter('ang_gain', 1.5)
         self.declare_parameter('lin_gain', 1.0)
         # Escalado de velocidad cerca de obstáculos (min ratio)
         self.declare_parameter('slowdown_min_scale', 0.2)
         # Ponderación angular del repulsivo y suavizado de comandos
-        self.declare_parameter('front_weight_deg', 50.0)
-        self.declare_parameter('rep_scale_side', 0.3)
-        self.declare_parameter('smooth_alpha', 0.3)
-        # Compensación por montaje del láser (grados, 0 si mira exactamente al frente)
-        self.declare_parameter('scan_angle_offset_deg', 0.0)
+        self.declare_parameter('front_weight_deg', 80.0)
+        self.declare_parameter('rep_scale_side', 0.42)
+        self.declare_parameter('smooth_alpha', 0.4)
         # Detección de estancamiento (tiempo sin progreso hacia la meta)
         self.declare_parameter('stuck_timeout', 3.0)
-        # Modo de objetivo: 'auto' (relativo si no hay sim), 'relative' (objetivo en el frame inicial del robot), 'absolute' (objetivo en odom)
-        self.declare_parameter('goal_mode', 'auto')
-        # Nota: use_sim_time es un parámetro especial; no lo declaramos para evitar conflictos si ya lo declara el sistema
-        # Seguridad en hardware real: no moverse sin láser reciente y parada por distancia mínima
-        self.declare_parameter('require_scan_to_move', True)
-        self.declare_parameter('scan_timeout', 1.0)  # segundos sin scan para considerar estancado
-        self.declare_parameter('safety_stop_dist', 0.15)  # parar si algo está más cerca que esto
+        # Fallback para atascos: seguir la mayor apertura (Follow-The-Gap)
+        self.declare_parameter('use_gap_follow', True)
+        self.declare_parameter('gap_clear_threshold', 0.55)  # m; si None usa d0_rep
+        self.declare_parameter('gap_min_width_deg', 12.0)
+        self.declare_parameter('gap_prefer_goal_weight', 0.6)  # [0..1] 1=todo objetivo, 0=solo apertura más grande
+        self.declare_parameter('recovery_mode', 'spin+gap')  # 'spin' | 'gap' | 'spin+gap'
+        self.declare_parameter('recovery_gap_duration', 3.0)
+        # Seguimiento de paredes (wall-follow) como fallback adicional
+        self.declare_parameter('use_wall_follow', True)
+        self.declare_parameter('wall_side', 'auto')  # 'auto' | 'left' | 'right'
+        self.declare_parameter('wall_distance', 0.38)
+        self.declare_parameter('wall_kp', 1.2)
+        self.declare_parameter('wall_lin_vel', 0.28)
+        self.declare_parameter('wall_timeout', 6.0)
+    # Cambio de pared en esquinas
+        self.declare_parameter('wall_front_switch_thresh', 0.45)
+        self.declare_parameter('wall_switch_margin', 0.07)
+    self.declare_parameter('wall_switch_cooldown', 1.5)
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -67,45 +72,38 @@ class PotentialFieldsNavigator(Node):
         self.goal_y = self.get_parameter('goal_y').value
         self.goal_tolerance = self.get_parameter('goal_tolerance').value
         self.odom_topic = self.get_parameter('odom_topic').value
-        self.scan_topic = self.get_parameter('scan_topic').value
-        self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         self.ang_gain = self.get_parameter('ang_gain').value
         self.lin_gain = self.get_parameter('lin_gain').value
         self.slowdown_min_scale = self.get_parameter('slowdown_min_scale').value
         self.front_weight_deg = self.get_parameter('front_weight_deg').value
         self.rep_scale_side = self.get_parameter('rep_scale_side').value
         self.smooth_alpha = max(0.0, min(1.0, self.get_parameter('smooth_alpha').value))
-        self.scan_angle_offset_deg = self.get_parameter('scan_angle_offset_deg').value
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
-        self.goal_mode = str(self.get_parameter('goal_mode').value)
-        self.require_scan = bool(self.get_parameter('require_scan_to_move').value)
-        self.scan_timeout = float(self.get_parameter('scan_timeout').value)
-        self.safety_stop_dist = float(self.get_parameter('safety_stop_dist').value)
-        # Leer use_sim_time si existe; si no, asumir False
-        use_sim_time_param = False
-        try:
-            if self.has_parameter('use_sim_time'):
-                use_sim_time_param = self.get_parameter('use_sim_time').value
-        except Exception:
-            use_sim_time_param = False
-        self.use_sim_time = bool(use_sim_time_param)
+        self.use_gap_follow = bool(self.get_parameter('use_gap_follow').value)
+        self.gap_clear_threshold = self.get_parameter('gap_clear_threshold').value
+        if self.gap_clear_threshold is None:
+            self.gap_clear_threshold = self.d0
+        self.gap_min_width_deg = float(self.get_parameter('gap_min_width_deg').value)
+        self.gap_prefer_goal_weight = float(self.get_parameter('gap_prefer_goal_weight').value)
+        self.recovery_mode = str(self.get_parameter('recovery_mode').value or 'gap').lower()
+        self.recovery_gap_duration = float(self.get_parameter('recovery_gap_duration').value)
+        self.use_wall_follow = bool(self.get_parameter('use_wall_follow').value)
+        self.wall_side = str(self.get_parameter('wall_side').value or 'auto').lower()
+        if self.wall_side not in ('auto','left','right'):
+            self.wall_side = 'auto'
+        self.wall_distance = float(self.get_parameter('wall_distance').value)
+        self.wall_kp = float(self.get_parameter('wall_kp').value)
+        self.wall_lin_vel = float(self.get_parameter('wall_lin_vel').value)
+        self.wall_timeout = float(self.get_parameter('wall_timeout').value)
+        self.wall_front_switch_thresh = float(self.get_parameter('wall_front_switch_thresh').value)
+    self.wall_switch_margin = float(self.get_parameter('wall_switch_margin').value)
+    self.wall_switch_cooldown = float(self.get_parameter('wall_switch_cooldown').value)
 
-        # Determinar si usamos objetivo relativo
-        if self.goal_mode == 'relative':
-            self.use_relative_goal = True
-        elif self.goal_mode == 'absolute':
-            self.use_relative_goal = False
-        else:  # 'auto'
-            self.use_relative_goal = not self.use_sim_time
-
-        # Usar QoS de datos de sensor para compatibilidad con drivers de hardware (best effort)
-        self.sub_scan = self.create_subscription(LaserScan, self.scan_topic, self.scan_callback, qos_profile_sensor_data)
+        self.sub_scan = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
         self.sub_odom = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
-        self.pub_cmd = self.create_publisher(Twist, self.cmd_vel_topic, 10)
+        self.pub_cmd = self.create_publisher(Twist, '/cmd_vel', 10)
 
         self.last_scan = None
-        self.last_scan_time = 0.0
-        self.last_warn_time = 0.0
         self.robot_x = 0.0
         self.robot_y = 0.0
         self.robot_yaw = 0.0
@@ -118,21 +116,35 @@ class PotentialFieldsNavigator(Node):
         self.recovery_end_time = 0.0
         self.last_goal_dist = float('inf')
         self.last_progress_time = self.get_clock().now().nanoseconds * 1e-9
+        self.in_gap_follow = False
+        self.gap_follow_end_time = 0.0
+        self.in_wall_follow = False
+        self.wall_follow_end_time = 0.0
+    self.wall_follow_side = 'left'
+    self.last_wall_switch_time = 0.0
 
         self.create_timer(0.05, self.control_loop)
 
-        # Variables para objetivo relativo anclado a la pose inicial
-        self.init_pose_set = False
-        self.init_x = 0.0
-        self.init_y = 0.0
-        self.init_yaw = 0.0
-        self.goal_world_set = False
-        self.goal_world_x = self.goal_x
-        self.goal_world_y = self.goal_y
+    # Public stop helper to ensure robot halts on shutdown/interruption
+    def stop_robot(self):
+        try:
+            zero = Twist()
+            zero.linear.x = 0.0
+            zero.angular.z = 0.0
+            self.pub_cmd.publish(zero)
+        except Exception:
+            # Best-effort during teardown
+            pass
+
+    # Ensure a stop is sent when the node is destroyed (extra safety)
+    def destroy_node(self):  # type: ignore[override]
+        try:
+            self.stop_robot()
+        finally:
+            return super().destroy_node()
 
     def scan_callback(self, msg: LaserScan):
         self.last_scan = msg
-        self.last_scan_time = self.get_clock().now().nanoseconds * 1e-9
 
     def odom_callback(self, msg: Odometry):
         pos = msg.pose.pose.position
@@ -144,34 +156,12 @@ class PotentialFieldsNavigator(Node):
         self.robot_yaw = float(yaw)
         self.odom_received = True
 
-        # Capturar pose inicial y fijar objetivo en mundo si usamos modo relativo
-        if self.use_relative_goal and not self.init_pose_set:
-            self.init_x = self.robot_x
-            self.init_y = self.robot_y
-            self.init_yaw = self.robot_yaw
-            self.init_pose_set = True
-            # Convertir objetivo relativo (frame inicial del robot) a odom
-            gx_rel, gy_rel = self.goal_x, self.goal_y
-            cy0 = math.cos(self.init_yaw)
-            sy0 = math.sin(self.init_yaw)
-            gx_w = self.init_x + gx_rel * cy0 - gy_rel * sy0
-            gy_w = self.init_y + gx_rel * sy0 + gy_rel * cy0
-            self.goal_world_x = gx_w
-            self.goal_world_y = gy_w
-            self.goal_world_set = True
-
     def compute_force_vector(self):
         # Si aún no hay láser, aplicamos solo fuerza atractiva hacia la meta
         if self.last_scan is None:
             if self.odom_received:
-                if self.use_relative_goal and self.goal_world_set:
-                    gx_w = self.goal_world_x
-                    gy_w = self.goal_world_y
-                else:
-                    gx_w = self.goal_x
-                    gy_w = self.goal_y
-                dx_w = gx_w - self.robot_x
-                dy_w = gy_w - self.robot_y
+                dx_w = self.goal_x - self.robot_x
+                dy_w = self.goal_y - self.robot_y
                 cy = math.cos(self.robot_yaw)
                 sy = math.sin(self.robot_yaw)
                 dx = dx_w * cy + dy_w * sy
@@ -196,16 +186,8 @@ class PotentialFieldsNavigator(Node):
 
         # campo atractivo hacia meta (usar odometría si está disponible)
         if self.odom_received:
-            # Elegir objetivo en odom (absoluto o relativo-anclado)
-            if self.use_relative_goal and self.goal_world_set:
-                gx_w = self.goal_world_x
-                gy_w = self.goal_world_y
-            else:
-                gx_w = self.goal_x
-                gy_w = self.goal_y
-
-            dx_w = gx_w - self.robot_x
-            dy_w = gy_w - self.robot_y
+            dx_w = self.goal_x - self.robot_x
+            dy_w = self.goal_y - self.robot_y
             # Transformar a frame del robot (rotación -yaw)
             cy = math.cos(self.robot_yaw)
             sy = math.sin(self.robot_yaw)
@@ -232,7 +214,6 @@ class PotentialFieldsNavigator(Node):
             a_max = float(angles.max())
             bin_edges = np.linspace(a_min, a_max, rep_bins + 1)
             front_rad = math.radians(self.front_weight_deg)
-            angle_off = math.radians(float(self.scan_angle_offset_deg))
             for i in range(rep_bins):
                 a0 = bin_edges[i]
                 a1 = bin_edges[i + 1]
@@ -243,34 +224,26 @@ class PotentialFieldsNavigator(Node):
                 # Filtrar por debajo de d0 para contribución
                 r_eff = np.percentile(r_bin, p)
                 theta = 0.5 * (a0 + a1)
-                # Compensar offset de montaje del sensor
-                theta_adj = theta + angle_off
                 if r_eff < self.d0:
                     # Ponderación angular: más peso en el frontal
                     w_ang = 1.0
-                    if abs(theta_adj) <= front_rad:
-                        w_ang = max(0.0, math.cos(theta_adj))  # [0..1] en frontal
+                    if abs(theta) <= front_rad:
+                        w_ang = max(0.0, math.cos(theta))  # [0..1] en frontal
                     else:
-                        w_ang = self.rep_scale_side * max(0.0, math.cos(theta_adj))
+                        w_ang = self.rep_scale_side * max(0.0, math.cos(theta))
 
                     if w_ang <= 0.0:
                         continue
 
                     magnitude = self.k_rep * (1.0 / r_eff - 1.0 / self.d0) * (1.0 / (r_eff * r_eff))
                     magnitude *= w_ang
-                    ux = -math.cos(theta_adj)
-                    uy = -math.sin(theta_adj)
+                    ux = -math.cos(theta)
+                    uy = -math.sin(theta)
                     F += magnitude * np.array([ux, uy])
 
         # Si estamos cerca de la meta, anular fuerzas para evitar oscilaciones
         if self.odom_received:
-            if self.use_relative_goal and self.goal_world_set:
-                gx_w = self.goal_world_x
-                gy_w = self.goal_world_y
-            else:
-                gx_w = self.goal_x
-                gy_w = self.goal_y
-            dist_goal = math.hypot(gx_w - self.robot_x, gy_w - self.robot_y)
+            dist_goal = math.hypot(self.goal_x - self.robot_x, self.goal_y - self.robot_y)
             if dist_goal <= self.goal_tolerance:
                 F = np.array([0.0, 0.0])
                 if not self.reached_goal_logged:
@@ -291,17 +264,6 @@ class PotentialFieldsNavigator(Node):
         return F
 
     def control_loop(self):
-        now = self.get_clock().now().nanoseconds * 1e-9
-        # Seguridad: no moverse si no hay scan reciente
-        if self.require_scan:
-            if (self.last_scan is None) or (now - self.last_scan_time > self.scan_timeout):
-                if now - self.last_warn_time > 1.0:
-                    self.get_logger().warn('Sin LaserScan reciente: deteniendo por seguridad. Verifica scan_topic/QoS.')
-                    self.last_warn_time = now
-                cmd = Twist()
-                self.pub_cmd.publish(cmd)
-                return
-
         F = self.compute_force_vector()
         # convertir a polar
         fx, fy = F
@@ -323,18 +285,6 @@ class PotentialFieldsNavigator(Node):
             valid = np.isfinite(ranges) & (ranges > 0.0)
             if np.any(valid):
                 rmin = float(np.min(ranges[valid]))
-                # Parada de seguridad si muy cerca
-                if rmin < self.safety_stop_dist:
-                    v = 0.0
-                    w = 0.0
-                    cmd = Twist()
-                    cmd.linear.x = 0.0
-                    cmd.angular.z = 0.0
-                    if now - self.last_warn_time > 0.5:
-                        self.get_logger().warn(f'Parada de seguridad: obstáculo a {rmin:.2f} m (< {self.safety_stop_dist:.2f} m).')
-                        self.last_warn_time = now
-                    self.pub_cmd.publish(cmd)
-                    return
                 if rmin < self.d0 and self.d0 > 1e-6:
                     obstacle_scale = max(self.slowdown_min_scale, rmin / self.d0)
 
@@ -349,13 +299,7 @@ class PotentialFieldsNavigator(Node):
         # Detección de estancamiento y recuperación (spin-in-place)
         now = self.get_clock().now().nanoseconds * 1e-9
         if self.odom_received:
-            if self.use_relative_goal and self.goal_world_set:
-                gx_w = self.goal_world_x
-                gy_w = self.goal_world_y
-            else:
-                gx_w = self.goal_x
-                gy_w = self.goal_y
-            dist_goal = math.hypot(gx_w - self.robot_x, gy_w - self.robot_y)
+            dist_goal = math.hypot(self.goal_x - self.robot_x, self.goal_y - self.robot_y)
             # progreso si disminuye la distancia de forma apreciable
             if dist_goal < self.last_goal_dist - 0.01:
                 self.last_progress_time = now
@@ -385,6 +329,63 @@ class PotentialFieldsNavigator(Node):
                 self.in_recovery = False
 
         # Suavizado de comandos (low-pass)
+        # Gap-follow fallback si estamos en recuperación o sin progreso
+        if self.use_gap_follow and (self.in_recovery or (now - self.last_progress_time > self.stuck_timeout)):
+            if not self.in_gap_follow:
+                self.in_gap_follow = True
+                self.gap_follow_end_time = now + max(1.0, self.recovery_gap_duration)
+            # Elegir un ángulo destino basado en aperturas del láser
+            gap_ok, target_heading = self._select_gap_heading()
+            if gap_ok:
+                # Comandar para orientarse al centro de la apertura y avanzar suave
+                # Mezclar con objetivo según peso para no perder dirección global
+                goal_heading = angle  # ya es el ángulo del vector resultante
+                mixed = self._mix_angles(goal_heading, target_heading, self.gap_prefer_goal_weight)
+                # Control simple: priorizar giro si desalineado
+                heading_err = self._angle_diff(mixed, 0.0)
+                w = max(-self.w_max, min(self.w_max, self.ang_gain * heading_err))
+                v = self.v_max * (0.4 if abs(heading_err) > math.pi/6 else 0.6)
+                # Suavizado de comandos (low-pass)
+                self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
+                self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
+                cmd = Twist()
+                cmd.linear.x = float(self.v_filt)
+                cmd.angular.z = float(self.w_filt)
+                self.pub_cmd.publish(cmd)
+                if now >= self.gap_follow_end_time:
+                    self.in_gap_follow = False
+                return
+            else:
+                # Si no hay aperturas útiles, intentar wall-follow si está activado
+                if self.use_wall_follow:
+                    if not self.in_wall_follow:
+                        self.in_wall_follow = True
+                        self.wall_follow_end_time = now + max(2.0, self.wall_timeout)
+                        # Elegir lado: auto = según signo del heading a la meta (positivo → izquierda)
+                        self.wall_follow_side = self._choose_wall_side()
+                    v, w = self._wall_follow_control()
+                    # suavizado
+                    self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
+                    self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
+                    cmd = Twist()
+                    cmd.linear.x = float(self.v_filt)
+                    cmd.angular.z = float(self.w_filt)
+                    self.pub_cmd.publish(cmd)
+                    if now >= self.wall_follow_end_time:
+                        self.in_wall_follow = False
+                    return
+                # Si wall-follow no está activo, dependiendo del modo hacer spin
+                if self.recovery_mode in ('spin', 'spin+gap'):
+                    w = min(self.w_max, 0.8 * self.w_max)
+                    v = 0.0
+                    self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
+                    self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
+                    cmd = Twist()
+                    cmd.linear.x = float(self.v_filt)
+                    cmd.angular.z = float(self.w_filt)
+                    self.pub_cmd.publish(cmd)
+                    return
+                # si recovery_mode='gap' continuar con control normal (sin return)
         self.v_filt = self.smooth_alpha * v + (1.0 - self.smooth_alpha) * self.v_filt
         self.w_filt = self.smooth_alpha * w + (1.0 - self.smooth_alpha) * self.w_filt
 
@@ -396,21 +397,202 @@ class PotentialFieldsNavigator(Node):
     def update_goal(self, x, y):
         self.goal_x = x
         self.goal_y = y
-        # Recalcular objetivo en mundo si estamos en modo relativo y ya tenemos pose inicial
-        if self.use_relative_goal and self.init_pose_set:
-            cy0 = math.cos(self.init_yaw)
-            sy0 = math.sin(self.init_yaw)
-            self.goal_world_x = self.init_x + x * cy0 - y * sy0
-            self.goal_world_y = self.init_y + x * sy0 + y * cy0
-            self.goal_world_set = True
         self.get_logger().info(f"Nuevo objetivo: ({x:.2f}, {y:.2f})")
+    # -------------------- Gap-follow helpers --------------------
+    @staticmethod
+    def _angle_diff(a: float, b: float) -> float:
+        """Return smallest signed angle a-b in [-pi, pi]."""
+        d = (a - b + math.pi) % (2 * math.pi) - math.pi
+        return d
+
+    @staticmethod
+    def _mix_angles(a: float, b: float, wa: float) -> float:
+        """Weighted mix of two angles. wa in [0..1] weights angle a vs b."""
+        # Convert to vectors to avoid wrap issues
+        va = np.array([math.cos(a), math.sin(a)])
+        vb = np.array([math.cos(b), math.sin(b)])
+        v = wa * va + (1.0 - wa) * vb
+        if np.linalg.norm(v) < 1e-9:
+            return 0.0
+        return math.atan2(v[1], v[0])
+
+    def _select_gap_heading(self):
+        """Detect useful gaps in LIDAR and return (ok, heading_rad) for the chosen gap.
+        Heading is in robot frame (0 forward, +left)."""
+        scan = self.last_scan
+        if scan is None or len(scan.ranges) == 0 or scan.angle_increment == 0.0:
+            return False, 0.0
+        ranges = np.array(scan.ranges)
+        valid = np.isfinite(ranges) & (ranges > 0.0)
+        if not np.any(valid):
+            return False, 0.0
+        ranges = ranges.copy()
+        # Clip invalid to a small value so they count as blocked
+        ranges[~valid] = 0.0
+        n = ranges.shape[0]
+        thr = float(self.gap_clear_threshold)
+        free = ranges > thr
+        # Find contiguous free segments
+        gaps = []  # list of (i0, i1, width, center_idx)
+        i = 0
+        while i < n:
+            if free[i]:
+                start = i
+                while i < n and free[i]:
+                    i += 1
+                end = i - 1
+                width = end - start + 1
+                gaps.append((start, end, width, start + width // 2))
+            i += 1
+        if not gaps:
+            return False, 0.0
+        # Convert indices to angles and filter by min angular width
+        min_w = max(1, int(round(math.radians(self.gap_min_width_deg) / max(1e-9, scan.angle_increment))))
+        cand = []  # (score, center_angle, width)
+        # Determine desired goal heading (angle of attractive vector in robot frame)
+        if self.odom_received:
+            dx_w = self.goal_x - self.robot_x
+            dy_w = self.goal_y - self.robot_y
+            cy = math.cos(self.robot_yaw)
+            sy = math.sin(self.robot_yaw)
+            dx = dx_w * cy + dy_w * sy
+            dy = -dx_w * sy + dy_w * cy
+            goal_heading = math.atan2(dy, dx)
+        else:
+            goal_heading = 0.0
+        for (i0, i1, w, ic) in gaps:
+            if w < min_w:
+                continue
+            a_center = scan.angle_min + ic * scan.angle_increment
+            # Score: blend of width (clearance proxy) and closeness to goal heading
+            width_score = w / n
+            ang_err = abs(self._angle_diff(goal_heading, a_center))
+            ang_score = 1.0 - min(1.0, ang_err / math.pi)  # 1 best when aligned
+            score = (1.0 - self.gap_prefer_goal_weight) * width_score + self.gap_prefer_goal_weight * ang_score
+            cand.append((score, a_center, w))
+        if not cand:
+            return False, 0.0
+        cand.sort(key=lambda x: x[0], reverse=True)
+        return True, cand[0][1]
+
+    # -------------------- Wall-follow helpers --------------------
+    def _choose_wall_side(self) -> str:
+        # Si hay odometría y un heading claro a la meta, usa su signo
+        if self.odom_received:
+            dx_w = self.goal_x - self.robot_x
+            dy_w = self.goal_y - self.robot_y
+            cy = math.cos(self.robot_yaw)
+            sy = math.sin(self.robot_yaw)
+            dx = dx_w * cy + dy_w * sy
+            dy = -dx_w * sy + dy_w * cy
+            goal_heading = math.atan2(dy, dx)
+            if self.wall_side == 'auto':
+                return 'left' if goal_heading >= 0.0 else 'right'
+        if self.wall_side in ('left','right'):
+            return self.wall_side
+        return 'left'
+
+    def _sector_values_by_deg(self, min_deg: float, max_deg: float):
+        scan = self.last_scan
+        if scan is None:
+            return []
+        n = len(scan.ranges)
+        if n == 0 or scan.angle_increment == 0.0:
+            return []
+        a_min = scan.angle_min
+        a_inc = scan.angle_increment
+        lo = math.radians(min_deg)
+        hi = math.radians(max_deg)
+        def ang_to_idx(a: float) -> int:
+            i = int(round((a - a_min) / a_inc))
+            return max(0, min(n - 1, i))
+        i0 = ang_to_idx(lo)
+        i1 = ang_to_idx(hi)
+        if i0 > i1:
+            i0, i1 = i1, i0
+        vals = [r for r in list(self.last_scan.ranges)[i0:i1+1] if r is not None and math.isfinite(r) and r > 0.0]
+        return vals
+
+    @staticmethod
+    def _percentile_list(vals, p: float):
+        if not vals:
+            return None
+        s = sorted(vals)
+        k = max(0, min(len(s) - 1, int(round((p / 100.0) * (len(s) - 1)))))
+        return s[k]
+
+    def _side_distances(self):
+        # Sectores laterales ~60-120 grados
+        left_vals = self._sector_values_by_deg(60.0, 120.0)
+        right_vals = self._sector_values_by_deg(-120.0, -60.0)
+        left = self._percentile_list(left_vals, 30.0) if left_vals else None
+        right = self._percentile_list(right_vals, 30.0) if right_vals else None
+        return left, right
+
+    def _front_min(self):
+        vals = self._sector_values_by_deg(-20.0, 20.0)
+        if not vals:
+            return None
+        return min(vals) if vals else None
+
+    def _wall_follow_control(self):
+        # Control proporcional sencillo para mantener distancia a la pared seleccionada
+        left, right = self._side_distances()
+        side = self.wall_follow_side
+        desired = self.wall_distance
+        v = self.wall_lin_vel
+        w = 0.0
+        front = self._front_min()
+        now = self.get_clock().now().nanoseconds * 1e-9
+        # Detección de esquina y cambio de pared si procede
+        corner_thresh = max(0.3, min(self.wall_front_switch_thresh, max(0.3, self.d0)))
+        if self.use_wall_follow and front is not None and front < corner_thresh:
+            preferred = side
+            if left is not None and right is not None:
+                if left + self.wall_switch_margin < right:
+                    preferred = 'left'
+                elif right + self.wall_switch_margin < left:
+                    preferred = 'right'
+            elif left is not None:
+                preferred = 'left'
+            elif right is not None:
+                preferred = 'right'
+            if preferred != side and (now - self.last_wall_switch_time) > self.wall_switch_cooldown:
+                self.wall_follow_side = preferred
+                self.last_wall_switch_time = now
+                self.get_logger().info(f"Esquina detectada — cambiando a pared {preferred}.")
+                side = preferred
+        # Evitar colisión frontal
+        if front is not None and front < max(0.3, 0.7 * self.d0):
+            v *= 0.3
+            w += 0.8 * self.w_max * (-1.0 if side == 'right' else 1.0)
+        # Control lateral
+        if side == 'left' and left is not None:
+            e = desired - left  # positivo → demasiado lejos de la pared → girar a la izquierda
+            w += self.wall_kp * e
+        elif side == 'right' and right is not None:
+            e = desired - right  # positivo → lejos de la pared → girar a la derecha (w negativo)
+            w -= self.wall_kp * e
+        # Limitar
+        w = max(-self.w_max, min(self.w_max, w))
+        v = min(self.v_max, max(0.0, v))
+        return v, w
 
 def main(args=None):
     rclpy.init(args=args)
     node = PotentialFieldsNavigator()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # On shutdown/interrupt, stop the robot explicitly
+        node.get_logger().info('Apagando nodo de campos potenciales: enviando stop a /cmd_vel.')
+        node.stop_robot()
+        # tiny delay to allow message to flush
+        time.sleep(0.05)
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

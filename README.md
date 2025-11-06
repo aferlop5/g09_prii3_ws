@@ -24,8 +24,11 @@ g09_prii3_ws/
 ├─ launch/
 │  ├─ sprint1.launch.py
 │  ├─ jetbot_drawer.launch.py
+│  ├─ drawer_number_gazebo.launch.py
 │  ├─ obstacle_avoidance_simple.launch.py
-│  └─ obstacle_avoidance_advanced.launch.py
+│  ├─ obstacle_avoidance_advanced.launch.py
+│  ├─ Potential_Fields.launch.py
+│  └─ Potential_Fields_door_fast.launch.py
 ├─ resource/
 │  └─ g09_prii3
 ├─ src/
@@ -34,7 +37,8 @@ g09_prii3_ws/
 │     ├─ prii3_turtlesim_node.py
 │     ├─ drawer_number_gazebo.py
 │     ├─ jetbot_drawer_node.py
-│     └─ obstacle_avoidance_node.py
+│     ├─ obstacle_avoidance_node.py
+│     └─ Potential_Fields.py
 ├─ package.xml
 ├─ setup.py
 ├─ setup.cfg
@@ -51,9 +55,11 @@ Archivos clave (abre con un clic)
 - [resource/g09_prii3](resource/g09_prii3)  
 - [launch/sprint1.launch.py](launch/sprint1.launch.py)  
 - [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)  
+- [launch/drawer_number_gazebo.launch.py](launch/drawer_number_gazebo.launch.py)  
 - [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)  
 - [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)  
 - [launch/Potential_Fields.launch.py](launch/Potential_Fields.launch.py)  
+- [launch/Potential_Fields_door_fast.launch.py](launch/Potential_Fields_door_fast.launch.py)  
 - [src/g09_prii3/__init__.py](src/g09_prii3/__init__.py)  
 - [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py) — clase principal: [`TurtleNine`](src/g09_prii3/prii3_turtlesim_node.py)  
 - [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase principal: [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)  
@@ -87,6 +93,18 @@ source install/setup.bash
 ```
 
 2. Opciones de lanzamiento / ejecución según el tema (ver secciones abajo).
+
+---
+
+Requisito previo para mover el robot (JetBot)
+---
+Antes de lanzar cualquier nodo que haga que el robot se mueva (por ejemplo, `jetbot_drawer`, evitación de obstáculos o navegación), asegúrate de tener ejecutado en OTRA terminal el stack del JetBot:
+
+```bash
+ros2 launch jetbot_pro_ros2 jetbot.py
+```
+
+Déjalo corriendo mientras lanzas tus nodos desde otra terminal. Sin este proceso activo, los comandos de velocidad (`/cmd_vel`) no llegarán al controlador del robot.
 
 ---
 
@@ -161,81 +179,67 @@ ros2 service call /drawer/restart std_srvs/srv/Trigger "{}"
 
 Sprint 2 — JetBot
 ---
-Nodo: `jetbot_drawer`  
-Archivo: [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py) — clase [`JetbotDrawer`](src/g09_prii3/jetbot_drawer_node.py)
+Qué lanza el dibujo en cada entorno y por qué tenemos dos nodos/launch separados.
 
-Descripción
-- Publica comandos en `/cmd_vel` para que el stack de JetBot (o un controlador compatible) reproduzca la trayectoria "09". Parámetros de velocidad declarables (`linear_speed`, `angular_speed`).
+- Robot real (JetBot)
+  - Launch: `launch/jetbot_drawer.launch.py`
+  - Ejecutable: `jetbot_drawer`
+  - Ejecuta el nodo que publica `/cmd_vel` para dibujar “09” en el hardware real.
+  - Asume que el stack del JetBot ya está corriendo y escuchando `/cmd_vel`.
+  - Cómo lanzarlo:
+    ```bash
+    ros2 launch g09_prii3 jetbot_drawer.launch.py
+    ```
 
-Ejecución (si está instalado con setup.py)
-```bash
-ros2 run g09_prii3 jetbot_drawer
-```
+- Simulación (Gazebo con TurtleBot3 burger)
+  - Launch: `launch/drawer_number_gazebo.launch.py`
+  - Ejecutable: `drawer_number_gazebo`
+  - Este launch configura `TURTLEBOT3_MODEL=burger`, abre `turtlebot3_gazebo/empty_world.launch.py` y, tras unos segundos, arranca el nodo que publica `/cmd_vel` para dibujar “9”.
+  - Requiere tener instalado el paquete `turtlebot3_gazebo`.
+  - Cómo lanzarlo:
+    ```bash
+    ros2 launch g09_prii3 drawer_number_gazebo.launch.py
+    ```
 
-Servicios asociados
-```bash
-ros2 service call /jetbot_drawer/pause   std_srvs/srv/Trigger {}
-ros2 service call /jetbot_drawer/resume  std_srvs/srv/Trigger {}
-ros2 service call /jetbot_drawer/restart std_srvs/srv/Trigger {}
-```
+Por qué dos nodos/launch (decisión de diseño)
+- Especialización específica: Cada nodo está optimizado para su entorno sin código condicional complejo. El launch de Gazebo levanta el simulador y el entorno, mientras que el de JetBot asume el robot real ya está listo.
+- Mantenimiento simplificado: Código más limpio y fácil de actualizar por separado. Los launch files tienen responsabilidades claras: uno para simulación (con Gazebo) y otro para el robot real (sin Gazebo).
+- Configuración directa: Launch files específicos que evitan parámetros condicionales y errores. El launch de Gazebo incluye la puesta en marcha del simulador, mientras que el de JetBot se enfoca solo en el control del robot real.
+- Depuración más eficiente: Problemas identificados más rápido al tener responsabilidades separadas. Al lanzar Gazebo en un launch y el robot real en otro, se aísla mejor los problemas de simulación de los del hardware.
 
-También puedes lanzar con:
-```bash
-ros2 launch g09_prii3 jetbot_drawer.launch.py
-```
-Archivo de launch: [launch/jetbot_drawer.launch.py](launch/jetbot_drawer.launch.py)
-
-Evitación de obstáculos con Lidar (Sprint 2)
+Sprint 2 — Evitación de obstáculos
 ---
-Nodo: `jetbot_obstacle_avoidance`  
-Archivo: [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py) — clase [`JetbotAvoider`](src/g09_prii3/obstacle_avoidance_node.py)
+Qué lanzan los modos y en qué se diferencian. Mismo ejecutable, dos launch para dos comportamientos.
 
-Descripción
-- Publica velocidad en `/cmd_vel` y se suscribe a `/scan` (Lidar) para detectar obstáculos.
-- Modo `simple`: se detiene si un obstáculo está más cerca que un umbral (por defecto 0.3 m) y reanuda cuando despeja.
-- Modo `advanced`: esquiva el obstáculo girando hacia el lado con mayor despeje mientras avanza lentamente.
-- Logs informativos: "Avanzando", "obstáculo detectado — deteniendo", "evitando obstáculo", etc.
+- Robot real (JetBot)
+  - Launch (modo simple): `launch/obstacle_avoidance_simple.launch.py`
+  - Launch (modo advanced): `launch/obstacle_avoidance_advanced.launch.py`
+  - Ejecutable: `jetbot_obstacle_avoidance`
+  - Comportamiento:
+    - Simple → "collision avoidance": se para delante del obstáculo y reanuda cuando desaparece.
+    - Advanced → "obstacle avoidance": esquiva el obstáculo bordeándolo sin detener la marcha.
+  - Cómo lanzarlo:
+    ```bash
+    # Simple (para y reanuda)
+    ros2 launch g09_prii3 obstacle_avoidance_simple.launch.py
 
-Parámetros
-- `linear_speed` (float, default 0.15): velocidad lineal (m/s)
-- `angular_speed` (float, default 0.6): velocidad angular (rad/s)
-- `obstacle_threshold` (float, default 0.3): umbral de detección frontal (m)
-- `avoidance_mode` (string, default `simple`): `simple` | `advanced`
+    # Advanced (evita en marcha)
+    ros2 launch g09_prii3 obstacle_avoidance_advanced.launch.py
+    ```
 
-Ejecución directa
-```bash
-ros2 run g09_prii3 jetbot_obstacle_avoidance
-```
+- Simulación (Gazebo con TurtleBot3 burger)
+  - Si Gazebo ya está abierto con un robot que publique `/scan` y escuche `/cmd_vel` (p. ej., TurtleBot3), cualquiera de los dos launch anteriores (simple o advanced) funcionará en la simulación sin cambios.
+  - Requisito: tener `turtlebot3_gazebo` instalado si deseas abrir la simulación estándar de TurtleBot3.
 
-Launch dedicados por modo (sin parámetros)
-```bash
-# Modo simple (se detiene ante el obstáculo y reanuda cuando despeja)
-ros2 launch g09_prii3 obstacle_avoidance_simple.launch.py
-
-# Modo avanzado (evita el obstáculo girando y avanzando lentamente)
-ros2 launch g09_prii3 obstacle_avoidance_advanced.launch.py
-```
-Archivos de launch:
-- [launch/obstacle_avoidance_simple.launch.py](launch/obstacle_avoidance_simple.launch.py)
-- [launch/obstacle_avoidance_advanced.launch.py](launch/obstacle_avoidance_advanced.launch.py)
-
-Nota: para el dibujo del "09" usa `jetbot_drawer.launch.py`. Para evitación de obstáculos usa uno de los launch dedicados indicados arriba.
-
-
-Ejercicios — Gazebo / TurtleBot3
+Argumentos para usar un único nodo con dos launch files
+- Parámetros configurables: el mismo nodo acepta parámetros ROS (por ejemplo, `avoidance_mode`) que cambian completamente el comportamiento entre modo simple y avanzado.
+- Mantenimiento centralizado: todas las mejoras y correcciones se aplican una sola vez en un único archivo de nodo, evitando duplicación de código.
+- Configuración específica: cada launch file establece parámetros diferentes (p. ej., `obstacle_threshold`, `advanced_detect_factor`, etc.) optimizados para cada modo.
+- Flexibilidad operativa: permite cambiar entre comportamientos sin recompilar, solo modificando parámetros de lanzamiento.
+- Consistencia garantizada: ambos modos comparten la misma lógica base de procesado LIDAR y publicación a `/cmd_vel`.
 ---
-Nodo: `drawer_number` (simulación / TB3)  
-Archivo: [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py) — clase [`TurtlebotNine`](src/g09_prii3/drawer_number_gazebo.py)
 
-Descripción
-- Publica en `/cmd_vel` y termina al completar la secuencia. Diseñado para pruebas en simulador (Gazebo / TurtleBot3).
 
-Ejecución directa:
-```bash
-ros2 run g09_prii3 drawer_number_gazebo
-```
-
----
 
 Navegación — Campos Potenciales (JetBot / Gazebo)
 ---
@@ -246,11 +250,24 @@ Descripción
 - Navegación reactiva hacia una meta global `(goal_x, goal_y)` usando Campos Potenciales: atracción hacia la meta + repulsión por LIDAR.
 - Integra odometría (`/odom`) para calcular el vector atractivo real (posición del robot en mundo → vector en el frame del robot).
 - Estabilidad: suavizado low‑pass de comandos, reducción de velocidad cerca de obstáculos y ante grandes errores angulares.
-- Robustez: detección de estancamiento y recuperación (giro breve hacia el lado con más espacio), muestreo por sectores y percentiles en la repulsión para evitar ruido.
+- Robustez: detección de estancamiento y recuperación con estrategia combinada "spin+gap" puerta‑friendly por defecto:
+  - Follow‑The‑Gap: cuando no hay progreso, detecta la mayor apertura (p. ej., una puerta) y avanza hacia su centro.
+  - Si no hay hueco claro, alterna con un giro en el sitio para salir del mínimo local.
+  - Al pulsar Ctrl+C, publica un `Twist(0,0)` para detener motores antes de apagar.
 
 Lanzar (meta en metros en `odom`)
 ```bash
 ros2 launch g09_prii3 Potential_Fields.launch.py goal_x:=1.80 goal_y:=-0.03
+```
+
+Perfil rápido puerta‑friendly (recomendado para puertas/pasillos)
+```bash
+ros2 launch g09_prii3 Potential_Fields_door_fast.launch.py goal_x:=1.80 goal_y:=-0.03
+```
+
+Ejemplo real (valores usados en pruebas)
+```bash
+ros2 launch g09_prii3 Potential_Fields_door_fast.launch.py goal_x:=-6.357 goal_y:=-2.92
 ```
 
 Parámetros principales
@@ -258,16 +275,24 @@ Parámetros principales
 - `goal_tolerance` (float, default 0.10): radio de llegada en metros.
 - `odom_topic` (string, default `/odom`): tópico de odometría.
 - `k_att` (float, default 1.0): ganancia atractiva.
-- `k_rep` (float, default 0.30): ganancia repulsiva.
-- `d0_rep` (float, default 0.53): radio de influencia repulsiva.
+- `k_rep` (float, default 0.32): ganancia repulsiva.
+- `d0_rep` (float, default 0.55): radio de influencia repulsiva.
 - `max_lin_vel` (float, default 0.30), `max_ang_vel` (float, default 1.0): límites de velocidad.
 - `ang_gain` (float, default 1.5), `lin_gain` (float, default 1.0): ganancias del controlador.
-- `slowdown_min_scale` (float, default 0.18): factor mínimo de velocidad cerca de obstáculos.
-- `front_weight_deg` (float, default 85.0): ancho del sector frontal priorizado en repulsión.
-- `rep_scale_side` (float, default 0.45): peso relativo de repulsión en laterales.
-- `smooth_alpha` (float, default 0.30): coeficiente de suavizado de `v`/`w` (0..1).
+- `slowdown_min_scale` (float, default 0.20): factor mínimo de velocidad cerca de obstáculos.
+- `front_weight_deg` (float, default 80.0): ancho del sector frontal priorizado en repulsión.
+- `rep_scale_side` (float, default 0.42): peso relativo de repulsión en laterales.
+- `smooth_alpha` (float, default 0.40): coeficiente de suavizado de `v`/`w` (0..1).
 - `stuck_timeout` (float, default 3.0): tiempo sin progreso para activar recuperación.
 - `escape_gain` (float, default 0.20): pequeña perturbación aleatoria para escapar de mínimos locales.
+
+Parámetros de recuperación puerta‑friendly
+- `use_gap_follow` (bool, default `true`): activa el seguimiento de aperturas cuando no hay progreso.
+- `recovery_mode` (string, default `spin+gap`): `gap` | `spin` | `spin+gap`.
+- `gap_clear_threshold` (float, default = `d0_rep`): distancia considerada libre para formar una apertura.
+- `gap_min_width_deg` (float, default 12.0): anchura mínima de la apertura válida (grados).
+- `gap_prefer_goal_weight` (float, default 0.6): peso [0..1] para sesgar la apertura hacia la dirección de la meta.
+- `recovery_gap_duration` (float, default 3.0): tiempo de seguimiento de la apertura antes de re‑evaluar.
 
 Tópicos
 - Sub: `/scan` (sensor_msgs/LaserScan), `/odom` (nav_msgs/Odometry)
@@ -275,9 +300,10 @@ Tópicos
 
 Consejos de afinado
 - Más distancia frontal: sube `d0_rep` (+0.02..0.05) y/o `k_rep` (+0.02..0.05).
-- Más holgura lateral al girar: sube `rep_scale_side` (0.45→0.55) y/o `front_weight_deg` (85→90).
-- Menos oscilación: baja `ang_gain` o sube `smooth_alpha` (p.ej. 0.35).
+- Más holgura lateral al girar: sube `rep_scale_side` (0.42→0.50) y/o `front_weight_deg` (80→90).
+- Menos oscilación: baja `ang_gain` o sube `smooth_alpha` (p.ej. 0.45).
 - Más decisión hacia meta (en despeje): sube `lin_gain` o baja `slowdown_min_scale` con cuidado.
+- Si duda en puertas: baja `gap_min_width_deg` (p.ej. 10) o `gap_prefer_goal_weight` (0.5).
 
 Archivo de launch: [launch/Potential_Fields.launch.py](launch/Potential_Fields.launch.py)
 
@@ -311,6 +337,9 @@ Recursos y enlaces rápidos
 - Código fuente: [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py), [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py), [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py), [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py)
 
 ---
+Notas
+- El launch `drawer_number_gazebo.launch.py` exporta automáticamente `TURTLEBOT3_MODEL=burger` e incluye `turtlebot3_gazebo/empty_world.launch.py`.
+
 
 <center>
 **Autor:** Agustí Ferrandiz
