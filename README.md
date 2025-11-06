@@ -21,6 +21,10 @@ Estructura del workspace
 ---
 ```
 g09_prii3_ws/
+├─ aruco/
+├─ build/
+├─ calibracion/
+├─ install/
 ├─ launch/
 │  ├─ sprint1.launch.py
 │  ├─ jetbot_drawer.launch.py
@@ -28,7 +32,10 @@ g09_prii3_ws/
 │  ├─ obstacle_avoidance_simple.launch.py
 │  ├─ obstacle_avoidance_advanced.launch.py
 │  ├─ Potential_Fields.launch.py
-│  └─ Potential_Fields_door_fast.launch.py
+│  ├─ Potential_Fields_door_fast.launch.py
+│  └─ rviz_predefinido_node.launch.py
+├─ log/
+├─ maps/
 ├─ resource/
 │  └─ g09_prii3
 ├─ src/
@@ -38,10 +45,10 @@ g09_prii3_ws/
 │     ├─ drawer_number_gazebo.py
 │     ├─ jetbot_drawer_node.py
 │     ├─ obstacle_avoidance_node.py
-│     └─ Potential_Fields.py
-├─ package.xml
-├─ setup.py
+│     ├─ Potential_Fields.py
+│     └─ rviz_predefinido_node.py
 ├─ setup.cfg
+├─ setup.py
 ├─ .gitignore
 └─ README.md
 ```
@@ -263,8 +270,6 @@ Argumentos para usar un único nodo con dos launch files
 - Consistencia garantizada: ambos modos comparten la misma lógica base de procesado LIDAR y publicación a `/cmd_vel`.
 ---
 
-
-
 Navegación — Campos Potenciales (JetBot / Gazebo)
 ---
 Nodo: `jetbot_potential_fields`  
@@ -330,6 +335,48 @@ Consejos de afinado
 - Si duda en puertas: baja `gap_min_width_deg` (p.ej. 10) o `gap_prefer_goal_weight` (0.5).
 
 Archivo de launch: [launch/Potential_Fields.launch.py](launch/Potential_Fields.launch.py)
+
+---
+
+Simulación SLAM y navegación con Gazebo y TurtleBot
+---
+Nodo: `rviz_predefinido_node`  
+Archivo: [src/g09_prii3/rviz_predefinido_node.py](src/g09_prii3/rviz_predefinido_node.py) — clase `RvizPredefinidoNode`
+
+Descripción Técnica
+Este nodo resuelve la discrepancia fundamental entre los sistemas de coordenadas de Gazebo y RViz mediante la implementación de una transformada de coordenadas lineal. Cuando se genera un mapa con Cartographer, el origen (0,0) en RViz corresponde al punto de spawn inicial del robot en Gazebo, que en nuestro entorno de simulación se encuentra en las coordenadas (-2, -0.5).
+
+Funcionamiento del Nodo
+- Transformación de coordenadas: Aplica la transformada lineal x_mapa = x_gazebo + 2.0 y y_mapa = y_gazebo + 0.5 para convertir automáticamente las coordenadas especificadas en Gazebo al sistema de referencia del mapa utilizado por Nav2.
+- Gestión de suscripciones: Se suscribe a los tópicos de estimación de pose (/amcl_pose) para determinar la posición inicial del robot y monitorizar su localización durante la navegación.
+- Publicación de objetivos: Gestiona el envío de objetivos de navegación al stack de Nav2, transformando previamente las coordenadas de destino del sistema Gazebo al sistema mapa.
+- Control de flujo: Implementa una secuencia automatizada que publica la pose inicial en (0,0) del mapa (equivalente a (-2,-0.5) en Gazebo) y posteriormente envía el goal de navegación tras los delays configurados.
+
+Ejecución del Sistema Completo
+Para ejecutar la simulación completa, abre tres terminales independientes:
+
+Terminal 1 - Simulador Gazebo:
+```bash
+export TURTLEBOT3_MODEL=burger
+ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+```
+
+Terminal 2 - Navegación:
+```bash
+export TURTLEBOT3_MODEL=burger
+ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True map:=/home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/map1.yaml
+```
+
+Terminal 3 - Nodo de Navegación Predefinida:
+```bash
+ros2 launch g09_prii3 rviz_predefinido_node.launch.py
+```
+
+Características Técnicas
+- Abstracción completa: El usuario trabaja exclusivamente con coordenadas de Gazebo
+- Transformación automática: Conversión transparente entre sistemas de coordenadas
+- Inicialización inmediata: No requiere espera para detección de pose inicial
+- Integración con Nav2: Compatibilidad total con el stack de navegación ROS2
 
 ---
 
