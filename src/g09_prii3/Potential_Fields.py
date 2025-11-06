@@ -56,10 +56,10 @@ class PotentialFieldsNavigator(Node):
         self.declare_parameter('wall_kp', 1.2)
         self.declare_parameter('wall_lin_vel', 0.28)
         self.declare_parameter('wall_timeout', 6.0)
-    # Cambio de pared en esquinas
+        # Cambio de pared en esquinas
         self.declare_parameter('wall_front_switch_thresh', 0.45)
         self.declare_parameter('wall_switch_margin', 0.07)
-    self.declare_parameter('wall_switch_cooldown', 1.5)
+        self.declare_parameter('wall_switch_cooldown', 1.5)
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -96,8 +96,8 @@ class PotentialFieldsNavigator(Node):
         self.wall_lin_vel = float(self.get_parameter('wall_lin_vel').value)
         self.wall_timeout = float(self.get_parameter('wall_timeout').value)
         self.wall_front_switch_thresh = float(self.get_parameter('wall_front_switch_thresh').value)
-    self.wall_switch_margin = float(self.get_parameter('wall_switch_margin').value)
-    self.wall_switch_cooldown = float(self.get_parameter('wall_switch_cooldown').value)
+        self.wall_switch_margin = float(self.get_parameter('wall_switch_margin').value)
+        self.wall_switch_cooldown = float(self.get_parameter('wall_switch_cooldown').value)
 
         self.sub_scan = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
         self.sub_odom = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
@@ -120,8 +120,8 @@ class PotentialFieldsNavigator(Node):
         self.gap_follow_end_time = 0.0
         self.in_wall_follow = False
         self.wall_follow_end_time = 0.0
-    self.wall_follow_side = 'left'
-    self.last_wall_switch_time = 0.0
+        self.wall_follow_side = 'left'
+        self.last_wall_switch_time = 0.0
 
         self.create_timer(0.05, self.control_loop)
 
