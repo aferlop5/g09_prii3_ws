@@ -82,6 +82,30 @@ sudo apt update
 sudo apt install -y ros-foxy-turtlesim
 ```
 
+Instalación completa de OpenCV (contrib) en Ubuntu 20.04
+```bash
+# 1) Actualiza sistema
+sudo apt update && sudo apt upgrade -y
+
+# 2) Instala dependencias del sistema
+sudo apt install -y libjpeg-dev libpng-dev libtiff-dev \
+                 libavcodec-dev libavformat-dev libswscale-dev \
+                 libv4l-dev libxvidcore-dev libx264-dev \
+                 libgtk-3-dev libatlas-base-dev gfortran
+
+# 3) Actualiza pip
+sudo python3 -m pip install --upgrade pip
+
+# 4) Instala OpenCV con módulos extra (incluye ArUco) y NumPy
+sudo python3 -m pip install opencv-contrib-python numpy
+```
+
+Verifica instalación
+```bash
+python3 -c "import cv2; print(cv2.__version__)"
+```
+Debería mostrar una versión similar a 4.12.0.
+
 ---
 
 Cómo ejecutar (rápido)
