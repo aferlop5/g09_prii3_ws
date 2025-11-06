@@ -51,6 +51,10 @@ class PotentialFieldsNavigator(Node):
         # Modo de objetivo: 'auto' (relativo si no hay sim), 'relative' (objetivo en el frame inicial del robot), 'absolute' (objetivo en odom)
         self.declare_parameter('goal_mode', 'auto')
         # Nota: use_sim_time es un parámetro especial; no lo declaramos para evitar conflictos si ya lo declara el sistema
+        # Seguridad en hardware real: no moverse sin láser reciente y parada por distancia mínima
+        self.declare_parameter('require_scan_to_move', True)
+        self.declare_parameter('scan_timeout', 1.0)  # segundos sin scan para considerar estancado
+        self.declare_parameter('safety_stop_dist', 0.15)  # parar si algo está más cerca que esto
 
         self.k_att = self.get_parameter('k_att').value
         self.k_rep = self.get_parameter('k_rep').value
@@ -74,6 +78,9 @@ class PotentialFieldsNavigator(Node):
         self.scan_angle_offset_deg = self.get_parameter('scan_angle_offset_deg').value
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
         self.goal_mode = str(self.get_parameter('goal_mode').value)
+        self.require_scan = bool(self.get_parameter('require_scan_to_move').value)
+        self.scan_timeout = float(self.get_parameter('scan_timeout').value)
+        self.safety_stop_dist = float(self.get_parameter('safety_stop_dist').value)
         # Leer use_sim_time si existe; si no, asumir False
         use_sim_time_param = False
         try:
@@ -97,6 +104,8 @@ class PotentialFieldsNavigator(Node):
         self.pub_cmd = self.create_publisher(Twist, self.cmd_vel_topic, 10)
 
         self.last_scan = None
+        self.last_scan_time = 0.0
+        self.last_warn_time = 0.0
         self.robot_x = 0.0
         self.robot_y = 0.0
         self.robot_yaw = 0.0
@@ -123,6 +132,7 @@ class PotentialFieldsNavigator(Node):
 
     def scan_callback(self, msg: LaserScan):
         self.last_scan = msg
+        self.last_scan_time = self.get_clock().now().nanoseconds * 1e-9
 
     def odom_callback(self, msg: Odometry):
         pos = msg.pose.pose.position
@@ -281,6 +291,17 @@ class PotentialFieldsNavigator(Node):
         return F
 
     def control_loop(self):
+        now = self.get_clock().now().nanoseconds * 1e-9
+        # Seguridad: no moverse si no hay scan reciente
+        if self.require_scan:
+            if (self.last_scan is None) or (now - self.last_scan_time > self.scan_timeout):
+                if now - self.last_warn_time > 1.0:
+                    self.get_logger().warn('Sin LaserScan reciente: deteniendo por seguridad. Verifica scan_topic/QoS.')
+                    self.last_warn_time = now
+                cmd = Twist()
+                self.pub_cmd.publish(cmd)
+                return
+
         F = self.compute_force_vector()
         # convertir a polar
         fx, fy = F
@@ -302,6 +323,18 @@ class PotentialFieldsNavigator(Node):
             valid = np.isfinite(ranges) & (ranges > 0.0)
             if np.any(valid):
                 rmin = float(np.min(ranges[valid]))
+                # Parada de seguridad si muy cerca
+                if rmin < self.safety_stop_dist:
+                    v = 0.0
+                    w = 0.0
+                    cmd = Twist()
+                    cmd.linear.x = 0.0
+                    cmd.angular.z = 0.0
+                    if now - self.last_warn_time > 0.5:
+                        self.get_logger().warn(f'Parada de seguridad: obstáculo a {rmin:.2f} m (< {self.safety_stop_dist:.2f} m).')
+                        self.last_warn_time = now
+                    self.pub_cmd.publish(cmd)
+                    return
                 if rmin < self.d0 and self.d0 > 1e-6:
                     obstacle_scale = max(self.slowdown_min_scale, rmin / self.d0)
 

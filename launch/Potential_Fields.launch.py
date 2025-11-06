@@ -30,6 +30,9 @@ def generate_launch_description() -> LaunchDescription:
 	smooth_alpha = DeclareLaunchArgument('smooth_alpha', default_value='0.3')
 	scan_angle_offset_deg = DeclareLaunchArgument('scan_angle_offset_deg', default_value='0.0')
 	stuck_timeout = DeclareLaunchArgument('stuck_timeout', default_value='3.0')
+	require_scan_to_move = DeclareLaunchArgument('require_scan_to_move', default_value='true')
+	scan_timeout = DeclareLaunchArgument('scan_timeout', default_value='1.0')
+	safety_stop_dist = DeclareLaunchArgument('safety_stop_dist', default_value='0.15')
 
 	pf_node = Node(
 		package='g09_prii3',
@@ -59,6 +62,9 @@ def generate_launch_description() -> LaunchDescription:
 			'smooth_alpha': ParameterValue(LaunchConfiguration('smooth_alpha'), value_type=float),
 			'scan_angle_offset_deg': ParameterValue(LaunchConfiguration('scan_angle_offset_deg'), value_type=float),
 			'stuck_timeout': ParameterValue(LaunchConfiguration('stuck_timeout'), value_type=float),
+			'require_scan_to_move': ParameterValue(LaunchConfiguration('require_scan_to_move'), value_type=bool),
+			'scan_timeout': ParameterValue(LaunchConfiguration('scan_timeout'), value_type=float),
+			'safety_stop_dist': ParameterValue(LaunchConfiguration('safety_stop_dist'), value_type=float),
 		}],
 		# Remappings (uncomment if your topics differ)
 		# remappings=[
@@ -90,6 +96,9 @@ def generate_launch_description() -> LaunchDescription:
 		scan_topic,
 		cmd_vel_topic,
 		stuck_timeout,
+		require_scan_to_move,
+		scan_timeout,
+		safety_stop_dist,
 		pf_node,
 	])
 
