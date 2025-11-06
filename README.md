@@ -372,6 +372,27 @@ Terminal 3 - Nodo de Navegación Predefinida:
 ros2 launch g09_prii3 rviz_predefinido_node.launch.py
 ```
 
+Sistema de Coordenadas: Gazebo vs RViz
+Durante el desarrollo identificamos una discrepancia fundamental entre los sistemas de coordenadas de Gazebo y RViz. Los mapas generados con Cartographer en RViz utilizan un sistema de coordenadas diferente al mundo de simulación de Gazebo, donde el origen (0,0) en RViz corresponde exactamente a la posición de spawn inicial del robot en Gazebo.
+
+En nuestro caso específico, esta relación se define como:
+- Posición en Gazebo: (-2, -0.5)
+- Posición equivalente en RViz: (0, 0)
+
+Solución Implementada
+Para resolver esta discrepancia, implementamos un nodo que gestiona automáticamente la transformación de coordenadas mediante la relación:
+```text
+x_mapa = x_gazebo + 2.0
+y_mapa = y_gazebo + 0.5
+```
+El nodo incluye:
+- Suscripción al topic de pose estimada para determinar la posición inicial
+- Capacidad para publicar en el topic de initialpose
+- Transformación automática de coordenadas de Gazebo al sistema de mapa de RViz
+- Integración con el action client de NavigateToPose de Nav2
+
+Esta solución permite trabajar intuitivamente con las coordenadas visibles en Gazebo, mientras el sistema de navegación opera correctamente con las coordenadas transformadas del mapa de RViz.
+
 Características Técnicas
 - Abstracción completa: El usuario trabaja exclusivamente con coordenadas de Gazebo
 - Transformación automática: Conversión transparente entre sistemas de coordenadas
@@ -379,7 +400,6 @@ Características Técnicas
 - Integración con Nav2: Compatibilidad total con el stack de navegación ROS2
 
 ---
-
 Notas finales y buenas prácticas
 ---
 - Para compilar en limpio:
