@@ -214,6 +214,7 @@ Qué lanza el dibujo en cada entorno y por qué tenemos dos nodos/launch separad
 
 - Robot real (JetBot)
   - Launch: `launch/jetbot_drawer.launch.py`
+  - Conexión con robot: `ssh -X jetbot@172.16.190.147`
   - Ejecutable: `jetbot_drawer`
   - Ejecuta el nodo que publica `/cmd_vel` para dibujar “09” en el hardware real.
   - Asume que el stack del JetBot ya está corriendo y escuchando `/cmd_vel`.
