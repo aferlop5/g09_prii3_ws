@@ -33,9 +33,11 @@ g09_prii3_ws/
 │  ├─ obstacle_avoidance_advanced.launch.py
 │  ├─ Potential_Fields.launch.py
 │  ├─ Potential_Fields_door_fast.launch.py
+│  ├─ f1l3_world.launch.py
 │  └─ rviz_predefinido_node.launch.py
 ├─ log/
 ├─ maps/
+├─ mundos_gazebo/
 ├─ resource/
 │  └─ g09_prii3
 ├─ src/
@@ -401,6 +403,52 @@ Características Técnicas
 - Transformación automática: Conversión transparente entre sistemas de coordenadas
 - Inicialización inmediata: No requiere espera para detección de pose inicial
 - Integración con Nav2: Compatibilidad total con el stack de navegación ROS2
+
+---
+Creación y uso de mapa de f1l3 en Gazebo
+---
+
+Descripción
+Hemos creado un mundo personalizado en Gazebo llamado `f1l3` que representa el entorno de laboratorio. Este mundo incluye un modelo de TurtleBot3 Burger que se spawnea automáticamente en una posición segura para evitar colisiones con las paredes. Las coordenadas de spawn del robot son críticas para una inicialización correcta.
+
+Comandos para ejecutar el mundo F1L3
+
+Compilación del paquete
+```bash
+colcon build --packages-select g09_prii3
+source install/setup.bash
+```
+
+Ejecución del mundo en Gazebo
+```bash
+# Asegurar que no hay procesos de Gazebo en ejecución
+pkill -f gazebo || true
+pkill -f gzserver || true
+pkill -f gzclient || true
+
+# Configurar el modelo de TurtleBot y la ruta de modelos
+export TURTLEBOT3_MODEL=burger
+export GAZEBO_MODEL_PATH="$GAZEBO_MODEL_PATH:$(ros2 pkg prefix g09_prii3)/share/g09_prii3/models:/opt/ros/foxy/share/turtlebot3_gazebo/models"
+
+# Lanzar el mundo F1L3
+gazebo --verbose install/g09_prii3/share/g09_prii3/worlds/f1l3.world
+```
+
+Coordenadas de spawn del TurtleBot3
+```text
+Posición (x, y, z): (-5.559452, -6.436104, 0.008823)
+Orientación (roll, pitch, yaw): (-0.003634, -0.042049, 0.007940)
+```
+
+Uso con el launch file
+```bash
+ros2 launch g09_prii3 f1l3_world.launch.py
+```
+
+Notas
+- El mundo `f1l3` incluye el modelo del entorno y el TurtleBot3 en la posición segura especificada.
+- Asegúrate de tener instalado el paquete `turtlebot3_gazebo` para que el modelo del robot esté disponible.
+- La variable `GAZEBO_MODEL_PATH` debe incluir la ruta a los modelos de tu paquete y los de TurtleBot3.
 
 ---
 Notas finales y buenas prácticas

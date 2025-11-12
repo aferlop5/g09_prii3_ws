@@ -12,7 +12,18 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
+        
+        # ARCHIVOS LAUNCH - desde la carpeta launch en raíz del workspace
+        (os.path.join('share', package_name, 'launch'), 
+         glob('launch/*.launch.py')),
+        
+        # WORLDS - desde mundos_gazebo en raíz del workspace  
+        (os.path.join('share', package_name, 'worlds'), 
+         glob('mundos_gazebo/*.world')),
+        
+        # MODELOS - desde la carpeta f1l3 dentro de mundos_gazebo
+        (os.path.join('share', package_name, 'models', 'f1l3'), 
+         glob('mundos_gazebo/f1l3/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
