@@ -434,10 +434,10 @@ export GAZEBO_MODEL_PATH="$GAZEBO_MODEL_PATH:$(ros2 pkg prefix g09_prii3)/share/
 gazebo --verbose install/g09_prii3/share/g09_prii3/worlds/f1l3.world
 ```
 
-Coordenadas de spawn del TurtleBot3
+Coordenadas de spawn del TurtleBot3 (oficiales)
 ```text
-Posición (x, y, z): (-5.559452, -6.436104, 0.008823)
-Orientación (roll, pitch, yaw): (-0.003634, -0.042049, 0.007940)
+Posición (x, y, z): (-4.527328, -2.852645, 0.008854)
+Orientación (roll, pitch, yaw): (0.001529, -0.008578, 0.008052)
 ```
 
 Uso con el launch file
@@ -448,7 +448,8 @@ ros2 launch g09_prii3 f1l3_world.launch.py
 Notas
 - El mundo `f1l3` incluye el modelo del entorno y el TurtleBot3 en la posición segura especificada.
 - Asegúrate de tener instalado el paquete `turtlebot3_gazebo` para que el modelo del robot esté disponible.
-- La variable `GAZEBO_MODEL_PATH` debe incluir la ruta a los modelos de tu paquete y los de TurtleBot3.
+- El launch fija `TURTLEBOT3_MODEL=burger` y prepara `GAZEBO_MODEL_PATH` automáticamente; en nuevas terminales, recuerda `source install/setup.bash` antes de lanzar.
+- Cada vez que lances el mundo, el robot aparecerá en la pose de spawn oficial indicada arriba.
 
 ---
 Notas finales y buenas prácticas

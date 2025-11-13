@@ -10,7 +10,7 @@
     <include>
       <uri>model://turtlebot3_burger</uri>
       <name>turtlebot3_burger</name>
-      <pose>-5.559452 -6.436104 0.008823 -0.003634 -0.042049 0.007940</pose>
+      <pose>-4.527328 -2.852645 0.008854 0.001529 -0.008578 0.008052</pose>
     </include>
     
     <!-- Ambiente básico de Gazebo -->
