@@ -479,6 +479,94 @@ Recursos y enlaces rápidos
 - Código fuente: [src/g09_prii3/prii3_turtlesim_node.py](src/g09_prii3/prii3_turtlesim_node.py), [src/g09_prii3/jetbot_drawer_node.py](src/g09_prii3/jetbot_drawer_node.py), [src/g09_prii3/obstacle_avoidance_node.py](src/g09_prii3/obstacle_avoidance_node.py), [src/g09_prii3/drawer_number_gazebo.py](src/g09_prii3/drawer_number_gazebo.py)
 
 ---
+Instrucciones Completas para Mapear tu Mundo F1L3 de Gazebo
+---
+1. Limpiar procesos y lanzar tu mundo F1L3
+
+```bash
+# Detener procesos de Gazebo existentes
+pkill -f gazebo || true
+pkill -f gzserver || true
+pkill -f gzclient || true
+
+# Configurar entorno
+export TURTLEBOT3_MODEL=burger
+export GAZEBO_MODEL_PATH="$GAZEBO_MODEL_PATH:$(ros2 pkg prefix g09_prii3)/share/g09_prii3/models:/opt/ros/foxy/share/turtlebot3_gazebo/models"
+
+# Lanzar tu mundo F1L3
+gazebo --verbose install/g09_prii3/share/g09_prii3/worlds/f1l3.world
+```
+
+2. Ejecutar nodo SLAM (Cartographer)
+
+En una nueva terminal (Ctrl+Alt+T):
+
+```bash
+export TURTLEBOT3_MODEL=burger
+ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True
+```
+
+3. Controlar el robot para mapear
+
+En otra terminal nueva:
+
+```bash
+export TURTLEBOT3_MODEL=burger
+ros2 run turtlebot3_teleop teleop_keyboard
+```
+
+Controles del robot:
+
+```text
+    w
+  a    s    d
+    x
+
+w/x: aumentar/disminuir velocidad lineal
+a/d: aumentar/disminuir velocidad angular  
+s: parada inmediata
+CTRL-C: salir
+```
+
+4. Guardar tu mapa personalizado
+
+Cuando el mapa en RViz esté completo, en una terminal nueva ejecuta:
+
+```bash
+# Crear directorio si no existe
+mkdir -p /home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/
+
+# Guardar el mapa con tu nombre personalizado
+ros2 run nav2_map_server map_saver_cli -f /home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/mapa_f1l3_gazebo
+```
+
+5. Verificar que se guardó correctamente
+
+```bash
+ls -la /home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/mapa_f1l3_gazebo.*
+```
+
+Deberías ver:
+
+- mapa_f1l3_gazebo.pgm (imagen del mapa)
+- mapa_f1l3_gazebo.yaml (configuración del mapa)
+
+6. Visualizar tu mapa
+
+```bash
+gpicview /home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/mapa_f1l3_gazebo.pgm
+```
+
+Orden recomendado de ejecución:
+
+- Terminal 1: Limpiar y lanzar Gazebo con tu mundo F1L3
+- Terminal 2: Ejecutar SLAM
+- Terminal 3: Teleoperación para mapear
+- Terminal 4: Guardar el mapa cuando esté completo
+
+Consejo: Mueve el robot por todas las áreas de tu mundo F1L3 para obtener un mapa completo antes de guardar.
+
+---
 Notas
 - El launch `drawer_number_gazebo.launch.py` exporta automáticamente `TURTLEBOT3_MODEL=burger` e incluye `turtlebot3_gazebo/empty_world.launch.py`.
 

@@ -13,17 +13,17 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         
-        # ARCHIVOS LAUNCH - desde la carpeta launch en raíz del workspace
+        # ARCHIVOS LAUNCH - incluir cualquier .py en launch
         (os.path.join('share', package_name, 'launch'), 
-         glob('launch/*.launch.py')),
+         glob('launch/*.py')),
         
-        # WORLDS - desde mundos_gazebo en raíz del workspace  
+        # WORLDS - instalar bajo share/<pkg>/worlds
         (os.path.join('share', package_name, 'worlds'), 
          glob('mundos_gazebo/*.world')),
         
-        # MODELOS - desde la carpeta f1l3 dentro de mundos_gazebo
+        # MODELOS - instalar bajo share/<pkg>/models/f1l3 (contenido recursivo)
         (os.path.join('share', package_name, 'models', 'f1l3'), 
-         glob('mundos_gazebo/f1l3/*')),
+         glob('mundos_gazebo/f1l3/**/*', recursive=True)),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
