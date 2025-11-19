@@ -445,6 +445,13 @@ Uso con el launch file
 ros2 launch g09_prii3 f1l3_world.launch.py
 ```
 
+Navegacion con nuestro mapa
+```bash
+export TURTLEBOT3_MODEL=burger
+ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True map:=/home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/mapa_f1l3_gazebo.yaml
+```
+
+
 Notas
 - El mundo `f1l3` incluye el modelo del entorno y el TurtleBot3 en la posición segura especificada.
 - Asegúrate de tener instalado el paquete `turtlebot3_gazebo` para que el modelo del robot esté disponible.
