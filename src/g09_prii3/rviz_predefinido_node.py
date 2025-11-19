@@ -68,8 +68,10 @@ class RvizPredefinidoNode(Node):
         # Mostrar información de transformación
         goal_x_gazebo = self.get_parameter('goal_pose_x_gazebo').value
         goal_y_gazebo = self.get_parameter('goal_pose_y_gazebo').value
-        goal_x_mapa = goal_x_gazebo + 2.0
-        goal_y_mapa = goal_y_gazebo + 0.5
+        self.gazebo_to_map_offset_x = self.get_parameter('gazebo_to_map_offset_x').value
+        self.gazebo_to_map_offset_y = self.get_parameter('gazebo_to_map_offset_y').value
+        goal_x_mapa = goal_x_gazebo + self.gazebo_to_map_offset_x
+        goal_y_mapa = goal_y_gazebo + self.gazebo_to_map_offset_y
         
         self.get_logger().info('✅ Nodo rviz_predefinido_node iniciado')
         self.get_logger().info('🎯 OBJETIVO EN COORDENADAS GAZEBO:')
@@ -86,13 +88,13 @@ class RvizPredefinidoNode(Node):
         initial_pose_msg.header.stamp = self.get_clock().now().to_msg()
         initial_pose_msg.header.frame_id = 'map'
         
-        # POSICIÓN INICIAL FIJA: (0,0) en MAPA = (-2,-0.5) en Gazebo
+        # POSICIÓN INICIAL FIJA: (0,0) en MAPA; calcular equivalente Gazebo por offsets
         initial_pose_msg.pose.pose.position.x = 0.0  # Mapa
         initial_pose_msg.pose.pose.position.y = 0.0  # Mapa
         initial_pose_msg.pose.pose.position.z = 0.0
         
-        # Orientación mirando hacia adelante
-        qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, 0.0)
+        # Orientación: utilizar la orientación del origen Gazebo proporcionada
+        qx, qy, qz, qw = quaternion_from_euler(0.001529, -0.008578, 0.008052)
         initial_pose_msg.pose.pose.orientation = Quaternion(x=qx, y=qy, z=qz, w=qw)
         
         # Covarianza (igual que antes)
@@ -110,8 +112,10 @@ class RvizPredefinidoNode(Node):
         initial_delay = self.get_parameter('initial_pose_delay').value
         nav_delay = self.get_parameter('nav_start_delay').value
         
-        self.get_logger().info(f'✅ Pose inicial publicada en (0,0) del mapa')
-        self.get_logger().info(f'📍 Equivale a (-2.0, -0.5) en Gazebo')
+        gazebo_x_for_map_origin = -self.gazebo_to_map_offset_x
+        gazebo_y_for_map_origin = -self.gazebo_to_map_offset_y
+        self.get_logger().info('✅ Pose inicial publicada en (0,0) del mapa')
+        self.get_logger().info(f'📍 Equivale a ({gazebo_x_for_map_origin:.6f}, {gazebo_y_for_map_origin:.6f}) en Gazebo')
         self.get_logger().info(f'⏳ Iniciando navegación en {nav_delay} segundos...')
         
         # Programar el envío del goal después del delay
@@ -123,13 +127,17 @@ class RvizPredefinidoNode(Node):
             return
             
         try:
+            # Esperar a que el servidor de la acción esté listo
+            if not self.nav_to_pose_client.wait_for_server(timeout_sec=10.0):
+                self.get_logger().error('❌ Servidor de navegación no disponible (timeout)')
+                return
             # Obtener coordenadas de Gazebo desde parámetros
             goal_x_gazebo = self.get_parameter('goal_pose_x_gazebo').value
             goal_y_gazebo = self.get_parameter('goal_pose_y_gazebo').value
             
             # TRANSFORMAR: Gazebo → Mapa
-            offset_x = self.get_parameter('gazebo_to_map_offset_x').value
-            offset_y = self.get_parameter('gazebo_to_map_offset_y').value
+            offset_x = self.gazebo_to_map_offset_x
+            offset_y = self.gazebo_to_map_offset_y
             goal_x_mapa = goal_x_gazebo + offset_x
             goal_y_mapa = goal_y_gazebo + offset_y
 
