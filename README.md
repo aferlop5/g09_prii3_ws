@@ -451,6 +451,27 @@ export TURTLEBOT3_MODEL=burger
 ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True map:=/home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/mapa_f1l3_gazebo.yaml
 ```
 
+Ejecución con códigos ArUco (marcadores en posiciones fijas)
+---
+
+Descripción
+- Ejecución del mundo `f1l3` con los marcadores ArUco colocados en posiciones fijas dentro del mundo. Esto facilita realizar pruebas donde los marcadores no se mueven; si necesitas variar escenarios, puedes modificar la posición de los marcadores en el archivo del mundo o en los modelos.
+
+Configurar entorno
+```bash
+export TURTLEBOT3_MODEL=waffle
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/universitat_agusti/tercero/proyecto/g09_prii3_ws/mundos_gazebo/ar_tags/model
+```
+
+# Lanzar el mundo
+```bash
+ros2 launch g09_prii3 f1l3_world.launch.py
+```
+
+Notas
+- Los marcadores ArUco están definidos en coordenadas fijas para no interferir con el spawn y el trazado del robot. Para pruebas adicionales, mueve los modelos de `ar_tags` dentro del world o modifica sus posiciones en los modelos.
+
+
 
 Notas
 - El mundo `f1l3` incluye el modelo del entorno y el TurtleBot3 en la posición segura especificada.
