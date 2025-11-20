@@ -8,8 +8,8 @@
     
     <!-- Añadir el turtlebot3 burger -->
     <include>
-      <uri>model://turtlebot3_burger</uri>
-      <name>turtlebot3_burger</name>
+      <uri>model://turtlebot3_waffle</uri>
+      <name>turtlebot3_waffle</name>
       <pose>-4.527328 -2.852645 0.008854 0.001529 -0.008578 0.008052</pose>
     </include>
     

@@ -41,6 +41,7 @@ setup(
             'jetbot_potential_fields = g09_prii3.Potential_Fields:main',
             'ml_test = g09_prii3.ml_test:main',
             'nav_f1l3_cordenadas = g09_prii3.nav_f1l3_cordenadas:main',
+            'autonomous_navigation = g09_prii3.autonomous_navigation:main',
             'rviz_predefinido_node = g09_prii3.rviz_predefinido_node:main',
         ],
     },
