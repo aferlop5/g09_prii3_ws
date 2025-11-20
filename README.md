@@ -21,25 +21,43 @@ Estructura del workspace
 ---
 ```
 g09_prii3_ws/
+├─ package.xml
+├─ README.md
+├─ setup.cfg
+├─ setup.py
+├─ .gitignore
 ├─ aruco/
+│  └─ aruco.py
+├─ output/
 ├─ build/
+│  └─ COLCON_IGNORE
 ├─ calibracion/
+│  ├─ calibrar_camara.py
+│  └─ dataset_calibracion/
 ├─ install/
+│  ├─ local_setup.bash
+│  ├─ local_setup.sh
+│  ├─ setup.bash
+│  └─ g09_prii3/
 ├─ launch/
-│  ├─ sprint1.launch.py
-│  ├─ jetbot_drawer.launch.py
+│  ├─ autonomous_navigation.launch.py
 │  ├─ drawer_number_gazebo.launch.py
-│  ├─ obstacle_avoidance_simple.launch.py
-│  ├─ obstacle_avoidance_advanced.launch.py
-│  ├─ Potential_Fields.launch.py
-│  ├─ Potential_Fields_door_fast.launch.py
 │  ├─ f1l3_world.launch.py
-│  └─ rviz_predefinido_node.launch.py
+│  ├─ jetbot_drawer.launch.py
+│  ├─ nav_f1l3_cordenadas.launch.py
+│  ├─ obstacle_avoidance_advanced.launch.py
+│  ├─ obstacle_avoidance_simple.launch.py
+│  ├─ Potential_Fields_door_fast.launch.py
+│  ├─ Potential_Fields.launch.py
+│  ├─ rviz_predefinido_node.launch.py
+│  └─ sprint1.launch.py
 ├─ log/
+│  └─ latest
 ├─ maps/
 ├─ mundos_gazebo/
+│  └─ f1l3.world
 ├─ resource/
-│  └─ g09_prii3
+│  └─ g09_prii3/
 ├─ src/
 │  └─ g09_prii3/
 │     ├─ __init__.py
@@ -49,10 +67,8 @@ g09_prii3_ws/
 │     ├─ obstacle_avoidance_node.py
 │     ├─ Potential_Fields.py
 │     └─ rviz_predefinido_node.py
-├─ setup.cfg
-├─ setup.py
-├─ .gitignore
-└─ README.md
+└─ mundOS_extras/
+  └─ (otros recursos y modelos)
 ```
 
 Archivos clave (abre con un clic)
