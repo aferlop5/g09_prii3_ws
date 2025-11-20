@@ -43,6 +43,8 @@ setup(
             'nav_f1l3_cordenadas = g09_prii3.nav_f1l3_cordenadas:main',
             'autonomous_navigation = g09_prii3.autonomous_navigation:main',
             'rviz_predefinido_node = g09_prii3.rviz_predefinido_node:main',
+            # NUEVO NODO AÑADIDO - Detección de ArUcos
+            'aruco_detector = g09_prii3.aruco_detector:main',
         ],
     },
 )

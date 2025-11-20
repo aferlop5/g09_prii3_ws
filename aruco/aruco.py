@@ -9,26 +9,25 @@ IMAGES_PATH = "./"  # Ruta donde buscar imágenes
 IMAGES_EXT = ["jpg", "jpeg", "png", "bmp"]  # Extensiones de imagen a buscar
 OUTPUT_PATH = "./output/"  # Carpeta para guardar resultados
 MARKER_LENGTH = 0.05  # Tamaño del marcador en metros (ajustar según necesidad)
-# Tamaño del texto para mostrar la ID (ajústalo si lo necesitas)
-ID_FONT_SCALE = 4
-ID_TEXT_THICKNESS = 5
+# Tamaño del texto para mostrar la ID
+ID_FONT_SCALE = 1.0
+ID_TEXT_THICKNESS = 2
 
 # Crear carpeta de salida si no existe
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 # Inicializar detector ArUco
 dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
-parameters = aruco.DetectorParameters()
-detector = aruco.ArucoDetector(dictionary, parameters)
+parameters = aruco.DetectorParameters_create()
 
-# Matriz de cámara aproximada (deberías calibrar tu cámara para mejores resultados)
+# Matriz de cámara aproximada
 camera_matrix = np.array([
     [1000, 0, 640],
     [0, 1000, 360],
     [0, 0, 1]
 ], dtype=np.float32)
 
-# Coeficientes de distorsión (normalmente cercanos a cero)
+# Coeficientes de distorsión
 dist_coeffs = np.zeros((4, 1))
 
 # Buscar imágenes en el directorio
@@ -48,7 +47,7 @@ for image_file in image_files:
         continue
     
     # Detectar marcadores
-    corners, ids, rejected = detector.detectMarkers(image)
+    corners, ids, rejected = aruco.detectMarkers(image, dictionary, parameters=parameters)
     
     if ids is not None:
         print(f"  Detectados {len(ids)} marcadores: {ids.flatten()}")
@@ -59,14 +58,15 @@ for image_file in image_files:
         # Procesar cada marcador detectado
         for i in range(len(ids)):
             # Estimar pose del marcador
-            rvec, tvec, _ = aruco.estimatePoseSingleMarkers(
+            rvec, tvec, _objPoints = aruco.estimatePoseSingleMarkers(
                 corners[i], MARKER_LENGTH, camera_matrix, dist_coeffs
             )
             
+            # CORRECCIÓN: Usar cv2.drawFrameAxes en lugar de aruco.drawAxis
             # Dibujar sistema de coordenadas
             cv2.drawFrameAxes(
                 image_out, camera_matrix, dist_coeffs, 
-                rvec, tvec, MARKER_LENGTH, 3
+                rvec, tvec, MARKER_LENGTH
             )
             
             # Dibujar ID del marcador

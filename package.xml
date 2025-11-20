@@ -34,6 +34,10 @@
   <exec_depend>gazebo_plugins</exec_depend>
   <exec_depend>turtlebot3_gazebo</exec_depend>
  
+  <!-- NUEVA DEPENDENCIA para el nodo ArUco -->
+  <depend>cv_bridge</depend>
+  <depend>opencv_contrib_python</depend>
+ 
   <export>
     <build_type>ament_python</build_type>
   </export>
