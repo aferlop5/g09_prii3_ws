@@ -487,13 +487,60 @@ ros2 launch g09_prii3 f1l3_world.launch.py
 Notas
 - Los marcadores ArUco están definidos en coordenadas fijas para no interferir con el spawn y el trazado del robot. Para pruebas adicionales, mueve los modelos de `ar_tags` dentro del world o modifica sus posiciones en los modelos.
 
+ 
+ 
+ **SPRINT 3: Navegación Autónoma con Detección de ArUcos**
 
+ Se usan los ArUcos que dio el profesor en clase; se han generado como objetos de Gazebo para poder usarlos dentro del mundo de simulación.
 
-Notas
-- El mundo `f1l3` incluye el modelo del entorno y el TurtleBot3 en la posición segura especificada.
-- Asegúrate de tener instalado el paquete `turtlebot3_gazebo` para que el modelo del robot esté disponible.
-- El launch fija `TURTLEBOT3_MODEL=burger` y prepara `GAZEBO_MODEL_PATH` automáticamente; en nuevas terminales, recuerda `source install/setup.bash` antes de lanzar.
-- Cada vez que lances el mundo, el robot aparecerá en la pose de spawn oficial indicada arriba.
+ Este nodo permite que el robot navegue automáticamente a una posición de detección y, dependiendo del ID del código ArUco detectado, ejecute una ruta predefinida.
+
+ Requisitos Previos
+ ```text
+ ROS2 Foxy
+
+ TurtleBot3 Waffle
+
+ Navegación con Navigation2
+
+ Mundo F1L3 en Gazebo
+
+ Cámara configurada en el robot
+ ```
+
+ Ejecución
+ Terminal 1 - Mundo Gazebo
+ ```bash
+ export TURTLEBOT3_MODEL=waffle
+ export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/universitat_agusti/tercero/proyecto/g09_prii3_ws/mundos_gazebo/ar_tags/model
+ ros2 launch g09_prii3 f1l3_world.launch.py
+ ```
+ Terminal 2 - Navigation2
+ ```bash
+ export TURTLEBOT3_MODEL=waffle
+ ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True map:=/home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws/maps/mapa_f1l3_gazebo.yaml
+ ```
+ Terminal 3 - Nodo de Navegación con ArUcos
+ ```bash
+ ros2 launch g09_prii3 aruco_nav_launch.py
+ ```
+ Funcionamiento
+ Flujo del Sistema
+ - Inicialización: El nodo establece la pose inicial y espera a que Navigation2 esté listo
+
+ - Navegación a posición de detección: El robot se dirige a las coordenadas `(3.249904, -2.563470)` en Gazebo
+
+ - Detección de ArUcos: Una vez en posición, activa la cámara para detectar códigos ArUco 5x5
+
+ - Ejecución de ruta: Dependiendo del ID detectado:
+   - ID 5: Ruta hacia la izquierda (pasillo3izq)
+   - ID 17: Ruta hacia la derecha (pasillo3der)
+
+ Notas
+ - El mundo `f1l3` incluye el modelo del entorno y el TurtleBot3 en la posición segura especificada.
+ - Asegúrate de tener instalado el paquete `turtlebot3_gazebo` para que el modelo del robot esté disponible.
+ - El launch fija `TURTLEBOT3_MODEL=burger` y prepara `GAZEBO_MODEL_PATH` automáticamente; en nuevas terminales, recuerda `source install/setup.bash` antes de lanzar.
+ - Cada vez que lances el mundo, el robot aparecerá en la pose de spawn oficial indicada arriba.
 
 ---
 Notas finales y buenas prácticas
