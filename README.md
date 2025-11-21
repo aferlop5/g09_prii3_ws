@@ -542,6 +542,22 @@ Notas
  - El launch fija `TURTLEBOT3_MODEL=burger` y prepara `GAZEBO_MODEL_PATH` automáticamente; en nuevas terminales, recuerda `source install/setup.bash` antes de lanzar.
  - Cada vez que lances el mundo, el robot aparecerá en la pose de spawn oficial indicada arriba.
 
+Extensibilidad
+----------------
+Para añadir nuevas rutas, modifica el diccionario `self.routes` en `aruco_nav_node.py`. Por ejemplo:
+
+```python
+self.routes = {
+  nuevo_id: [
+    ("punto1", x1, y1, yaw1),
+    ("punto2", x2, y2, yaw2),
+    # ...
+  ]
+}
+```
+
+Donde `nuevo_id` es el ID del marcador ArUco y cada tupla representa un punto objetivo con nombre, coordenadas `(x, y)` y orientación `yaw` en el frame del mapa.
+
 ---
 Notas finales y buenas prácticas
 ---
