@@ -1,0 +1,14 @@
+<?xml version="1.0" ?><sdf version="1.5">
+  <model name="aruco1_pau_clase_resized">
+    <static>true</static>
+    <link name="link">
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://aruco1_pau_clase_resized/meshes/aruco1_pau_clase_resized.dae</uri>
+          <scale>0.44 0.44 0.44</scale></mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

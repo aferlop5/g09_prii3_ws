@@ -45,6 +45,8 @@ setup(
             'rviz_predefinido_node = g09_prii3.rviz_predefinido_node:main',
             # NUEVO NODO AÑADIDO - Detección de ArUcos
             'aruco_detector = g09_prii3.aruco_detector:main',
+            # NUEVO NODO AÑADIDO - Navegación con ArUcos
+            'aruco_nav_node = g09_prii3.aruco_nav_node:main',
         ],
     },
 )

@@ -1,0 +1,14 @@
+<?xml version="1.0" ?><sdf version="1.6">
+  <model name="prueba_propio">
+    <static>true</static>
+    <link name="link">
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://prueba_propio/meshes/prueba_propio.dae</uri>
+          <scale>0.44 0.44 0.44</scale></mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
