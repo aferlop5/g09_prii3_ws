@@ -685,4 +685,3 @@ Notas
 <img alt="status" src="https://img.shields.io/badge/status-active-brightgreen" /> 
 <img alt="license" src="https://img.shields.io/badge/license-MIT-blue" />
 </center>
-

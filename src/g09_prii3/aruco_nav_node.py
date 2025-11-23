@@ -103,13 +103,20 @@ class ArucoNav(Node):
                 ("pasillo3", 3.0506, 12.7281, 1.5692),
                 ("pasillo3izq", -2.3742, 12.7366, -3.131)
             ],
-            # NUEVA RUTA para ID 17 (derecha al final)
+            # Ruta para ID 17 (derecha al final)
             17: [
                 ("puerta", 4.2887, 0.0093, 1.5692),
                 ("pasillo1", 3.0256, 3.9167, 1.5692),
                 ("pasillo2", 3.0446, 8.8183, 1.5692),
                 ("pasillo3", 3.0506, 12.7281, 1.5692),
                 ("pasillo3der", 4.4117, 12.8905, 0.0226)
+            ],
+            # NUEVA RUTA para ID 6 (entrada)
+            6: [
+                ("puerta", 4.2887, 0.0093, 1.5692),
+                ("pasillo1", 3.0256, 3.9167, 1.5692),
+                ("intermedia_entrada", 0.1712, 4.3739, -3.1359),
+                ("final_entrada", -2.4464, 4.3592, -3.13597)
             ]
         }
         
@@ -207,7 +214,7 @@ class ArucoNav(Node):
         
         # Set timeout for ArUco detection
         self.detection_timeout_timer = self.create_timer(30.0, self.detection_timeout)
-        self.get_logger().info('Esperando detección de ArUco ID 5 o 17...')
+        self.get_logger().info('Esperando detección de ArUco ID 5, 6 o 17...')  # Actualizado
 
     def image_callback(self, msg):
         """Process camera images for ArUco detection - EXACTAMENTE IGUAL QUE TU DETECTOR PROBADO"""
