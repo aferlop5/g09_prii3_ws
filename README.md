@@ -129,6 +129,7 @@ Ejemplo de ejecución (simulación completa):
 ```bash
 # Terminal 1: mundo Gazebo
 export TURTLEBOT3_MODEL=burger
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/universitat_agusti/tercero/proyecto/g09_prii3_ws/mundos_gazebo/ar_tags/model
 ros2 launch g09_prii3 f1l3_world.launch.py
 
 # Terminal 2: Navigation2 (use_sim_time true)
