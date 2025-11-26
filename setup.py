@@ -21,9 +21,13 @@ setup(
         (os.path.join('share', package_name, 'worlds'), 
          glob('mundos_gazebo/*.world')),
         
-        # MODELOS - instalar bajo share/<pkg>/models/f1l3 (contenido recursivo)
+        # MODELOS F1L3 - instalar bajo share/<pkg>/models/f1l3 (contenido recursivo)
         (os.path.join('share', package_name, 'models', 'f1l3'), 
          glob('mundos_gazebo/f1l3/**/*', recursive=True)),
+
+        # MODELOS EUROBOT - instalar bajo share/<pkg>/models/eurobot_world (contenido recursivo)
+        (os.path.join('share', package_name, 'models', 'eurobot_world'), 
+         glob('mundos_gazebo/eurobot_world/**/*', recursive=True)),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

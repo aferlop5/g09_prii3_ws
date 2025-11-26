@@ -12,6 +12,68 @@
 
 ---
 
+## 🌍 Mundo EUROBOT (Gazebo)
+
+### Descripción
+Mundo personalizado `eurobot.world` que carga el modelo `model://eurobot_world` (instalado en `setup.py`) y spawnea un TurtleBot3 Waffle compatible con ROS2 Foxy mediante un spawner explícito (`gazebo_ros spawn_entity.py`). Se replica el patrón usado en `f1l3`, pero adaptado porque en Foxy no existe `spawn_turtlebot3.launch.py`.
+
+### Preparación del modelo
+1. Carpeta del modelo: `mundos_gazebo/eurobot_world/` con `model.config` y `model.sdf`.
+2. Instalación añadida en `setup.py`:
+   - `(share/g09_prii3/models/eurobot_world)` para que `model://eurobot_world` se resuelva.
+3. Archivo del mundo: `mundos_gazebo/eurobot.world` instalado en `share/g09_prii3/worlds/`.
+
+### Launch (`eurobot.launch.py`)
+Acciones:
+- Ajusta `GAZEBO_MODEL_PATH` (modelos del paquete + TurtleBot3).
+- Exporta `TURTLEBOT3_MODEL=waffle`.
+- Lanza `gzserver` + `gzclient` con `eurobot.world`.
+- Publica el URDF con `robot_state_publisher` directo (URDF de `turtlebot3_description`).
+- Spawnea el Waffle con `spawn_entity.py` (robusto en Foxy/Humble).
+
+### Comandos para lanzar
+```bash
+cd /home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws
+colcon build --packages-select g09_prii3 --symlink-install
+source install/setup.bash
+
+export TURTLEBOT3_MODEL=waffle
+ros2 launch g09_prii3 eurobot.launch.py
+```
+
+### Parámetros opcionales de posición
+```bash
+ros2 launch g09_prii3 eurobot.launch.py x_pose:=1.0 y_pose:=0.5 z_pose:=0.0
+```
+
+### Diagnóstico rápido
+```bash
+echo "$GAZEBO_MODEL_PATH"
+ls $(ros2 pkg prefix turtlebot3_gazebo)/share/turtlebot3_gazebo/models | grep waffle || echo "Falta modelo waffle"
+```
+
+Instalar si falta:
+```bash
+sudo apt install ros-foxy-turtlebot3-gazebo ros-foxy-turtlebot3-description
+```
+
+### Cómo lo hicimos (resumen técnico)
+1. Creamos el directorio del modelo EUROBOT con `model.sdf` y `model.config`.
+2. Añadimos su instalación en `setup.py` para que Gazebo pueda resolver `model://eurobot_world`.
+3. Generamos `eurobot.world` siguiendo la estructura de `f1l3.world` (luz, plano, include del mundo y robot).
+4. Ajustamos el launch a Foxy reemplazando includes que no existen por nodos (`robot_state_publisher`, `spawn_entity.py`).
+5. Verificamos rutas con `GAZEBO_MODEL_PATH` y confirmamos presencia de `turtlebot3_waffle`.
+6. Añadimos fallback de spawn explícito para asegurar robot aunque el `<include>` falle.
+
+### Próximos pasos sugeridos
+- Integrar rutas de navegación y ArUco sobre el mundo EUROBOT reutilizando los nodos de Sprint 3.
+- Añadir mapa generado (SLAM) específico de EUROBOT a `maps/` y documentar conversión de coordenadas si difiere.
+- Incluir modelos adicionales (zonas de puntuación, obstáculos) bajo `models/eurobot_world`.
+
+---
+
+---
+
 ## 📋 Descripción del proyecto
 
 Este repositorio contiene el workspace ROS2 del proyecto *Robots Inteligentes (PRII3)* desarrollado por el **Grupo 09**. El objetivo es diseñar y programar un sistema robótico autónomo capaz de resolver los retos de la competición EUROBOT 2026.
@@ -128,12 +190,12 @@ Objetivo: MAPEO (Cartographer), navegación con Nav2 y detección de ArUco para 
 Ejemplo de ejecución (simulación completa):
 ```bash
 # Terminal 1: mundo Gazebo
-export TURTLEBOT3_MODEL=burger
+export TURTLEBOT3_MODEL=waffle
 export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/universitat_agusti/tercero/proyecto/g09_prii3_ws/mundos_gazebo/ar_tags/model
 ros2 launch g09_prii3 f1l3_world.launch.py
 
 # Terminal 2: Navigation2 (use_sim_time true)
-export TURTLEBOT3_MODEL=burger
+export TURTLEBOT3_MODEL=waffle
 ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True map:=maps/mapa_f1l3_gazebo.yaml
 
 # Terminal 3: Nodo que combina navegación y detección ArUco
@@ -156,7 +218,7 @@ Proceso resumido para mapear con Cartographer y guardar mapa:
 pkill -f gazebo || true
 
 # Lanzar mundo F1L3
-export TURTLEBOT3_MODEL=burger
+export TURTLEBOT3_MODEL=waffle
 gazebo --verbose install/g09_prii3/share/g09_prii3/worlds/f1l3.world
 
 # Ejecutar Cartographer

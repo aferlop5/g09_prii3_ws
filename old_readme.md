@@ -685,3 +685,51 @@ Notas
 <img alt="status" src="https://img.shields.io/badge/status-active-brightgreen" /> 
 <img alt="license" src="https://img.shields.io/badge/license-MIT-blue" />
 </center>
+
+---
+
+## 🌍 Mundo EUROBOT (Gazebo)
+
+Descripción
+Mundo `eurobot.world` que incluye el modelo `model://eurobot_world` (instalado vía `setup.py`) y spawnea un TurtleBot3 Waffle usando `gazebo_ros spawn_entity.py` (necesario en Foxy al no existir `spawn_turtlebot3.launch.py`).
+
+Comandos para lanzar:
+```bash
+cd /home/agusti/universitat_agusti/tercero/proyecto/g09_prii3_ws
+colcon build --packages-select g09_prii3 --symlink-install
+source install/setup.bash
+
+export TURTLEBOT3_MODEL=waffle
+ros2 launch g09_prii3 eurobot.launch.py
+```
+
+Posición inicial opcional:
+```bash
+ros2 launch g09_prii3 eurobot.launch.py x_pose:=1.0 y_pose:=0.5 z_pose:=0.0
+```
+
+Diagnóstico rápido si no aparece el robot:
+```bash
+echo "$GAZEBO_MODEL_PATH"
+ls $(ros2 pkg prefix turtlebot3_gazebo)/share/turtlebot3_gazebo/models | grep waffle || echo "Falta modelo waffle"
+```
+
+Instalar dependencias si faltan:
+```bash
+sudo apt install ros-foxy-turtlebot3-gazebo ros-foxy-turtlebot3-description
+```
+
+Cómo se implementó (resumen):
+1. Directorio `mundos_gazebo/eurobot_world/` con `model.config` y `model.sdf`.
+2. Entrada añadida en `setup.py` para instalar modelos en `share/g09_prii3/models/eurobot_world`.
+3. Archivo `eurobot.world` siguiendo patrón de `f1l3.world` (sun, ground_plane, includes).
+4. Adaptación del launch: uso directo de `robot_state_publisher` y `spawn_entity.py` por compatibilidad Foxy.
+5. Revisión de `GAZEBO_MODEL_PATH` y presencia de modelos TurtleBot3.
+6. Fallback de spawn explícito para garantizar el Waffle.
+
+Siguientes mejoras posibles:
+- Añadir objetos de puntuación EUROBOT en el model SDF.
+- Generar y publicar mapa específico (`maps/mapa_eurobot_gazebo.*`).
+- Integrar rutas con detección ArUco adaptadas al layout EUROBOT.
+
+---
